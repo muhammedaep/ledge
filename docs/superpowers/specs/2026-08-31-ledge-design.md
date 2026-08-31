@@ -164,6 +164,13 @@ FSEvents ──► FolderWatcher ──► DownloadSettler ──► Categorizer
 `ScanEngine` joins the same pipeline at `Categorizer`, producing a batch of
 `PlannedMove` values that the preview sheet filters before handing them to `FileMover`.
 
+> **As built.** Two boxes above were never created as separate types.
+> `ShelfModel`'s responsibilities live directly in `ShelfView` and `AppState`
+> (`recentRecords`, `refreshRowStatus`), and `FolderWatcher` is a concrete type
+> with no protocol in front of it — nothing needed a second implementation, so
+> the seam would have been ceremony. `OrganizePreview` was added in `LedgeCore`
+> to hold the preview's grouping, which this diagram does not show.
+
 ## 7. Component specifications
 
 ### 7.1 FolderWatcher
@@ -172,14 +179,20 @@ Wraps one `FSEventStreamRef` per watched folder, non-recursive (`kFSEventStreamC
 depth 1 — subdirectories of a watched folder are not descended into).
 
 ```swift
-protocol FolderWatching {
-    var onCandidate: ((URL) -> Void)? { get set }
-    func start(watching folders: [URL]) throws
-    func stop()
+public final class FolderWatcher: @unchecked Sendable {
+    public init(folders: [URL], onNewEntries: @escaping @Sendable (Set<URL>) -> Void)
+    public func start()
+    public func stop()
+    public private(set) var unavailableFolders: [URL]
 }
 ```
 
-Emits candidate URLs. Does no filtering beyond "this path changed and still exists".
+Emits new entries. Does no filtering beyond "this entry is here now and was not before".
+
+> **As built.** No `FolderWatching` protocol exists — nothing needed a second
+> implementation. `DispatchSource` directory events replaced FSEvents (plan
+> refinement in Task 10), and the type grew a reconnect poll after a deleted
+> folder's descriptor was found never to see later events at the same path.
 
 ### 7.2 DownloadSettler
 
