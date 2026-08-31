@@ -28,8 +28,7 @@ public enum ScanEngine {
         let snapshot = DirectorySnapshot(scanning: folder)
 
         // A folder that is itself a destination must not be filed into itself.
-        var reserved = Set(rules.categories.map(\.name))
-        reserved.insert(rules.fallbackName)
+        let reserved = rules.destinationFolderNames
 
         return snapshot.entries
             .filter { !reserved.contains($0.lastPathComponent) }

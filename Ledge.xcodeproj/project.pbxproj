@@ -9,12 +9,17 @@
 /* Begin PBXBuildFile section */
 		015B5D0888AC4145BDFCD24A /* LedgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F194968E22304171A2B77924 /* LedgeApp.swift */; };
 		23262EB335314923875619E8 /* ShelfView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F2B1F6E27F4C7DAA626279 /* ShelfView.swift */; };
+		A1B2C3D400114455AA660002 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660001 /* Preferences.swift */; };
+		A1B2C3D400114455AA660004 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660003 /* AppState.swift */; };
+		A1B2C3D400114455AA660005 /* LedgeCore in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D400114455AA660007 /* LedgeCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		8D2901CE4CED4DEAB33BB283 /* Ledge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ledge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F194968E22304171A2B77924 /* LedgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgeApp.swift; sourceTree = "<group>"; };
 		79F2B1F6E27F4C7DAA626279 /* ShelfView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfView.swift; sourceTree = "<group>"; };
+		A1B2C3D400114455AA660001 /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
+		A1B2C3D400114455AA660003 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -22,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D400114455AA660005 /* LedgeCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -40,6 +46,8 @@
 			isa = PBXGroup;
 			children = (
 				F194968E22304171A2B77924 /* LedgeApp.swift */,
+				A1B2C3D400114455AA660003 /* AppState.swift */,
+				A1B2C3D400114455AA660001 /* Preferences.swift */,
 				19C7F09942DB4C26BB9C6052 /* Shelf */,
 			);
 			path = Ledge;
@@ -77,6 +85,9 @@
 			dependencies = (
 			);
 			name = Ledge;
+			packageProductDependencies = (
+				A1B2C3D400114455AA660007 /* LedgeCore */,
+			);
 			productName = Ledge;
 			productReference = 8D2901CE4CED4DEAB33BB283 /* Ledge.app */;
 			productType = "com.apple.product-type.application";
@@ -105,6 +116,9 @@
 				Base,
 			);
 			mainGroup = 7A6E829AE29041289A771044;
+			packageReferences = (
+				A1B2C3D400114455AA660006 /* XCLocalSwiftPackageReference "LedgeCore" */,
+			);
 			productRefGroup = DF2E10727A7D47598DD16158 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -130,6 +144,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				015B5D0888AC4145BDFCD24A /* LedgeApp.swift in Sources */,
+				A1B2C3D400114455AA660004 /* AppState.swift in Sources */,
+				A1B2C3D400114455AA660002 /* Preferences.swift in Sources */,
 				23262EB335314923875619E8 /* ShelfView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -267,6 +283,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "Ledge files new downloads into folders for you.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -292,6 +309,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "Ledge files new downloads into folders for you.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -327,6 +345,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A1B2C3D400114455AA660006 /* XCLocalSwiftPackageReference "LedgeCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = LedgeCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1B2C3D400114455AA660007 /* LedgeCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LedgeCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 003E14CF67C74DBA8D0B7EC2 /* Project object */;
 }
