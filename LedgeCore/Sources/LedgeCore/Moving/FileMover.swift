@@ -34,6 +34,15 @@ extension MoveError: Equatable {
 /// Invariant: this never overwrites anything. On a name collision it inserts
 /// " (1)", " (2)", … before the extension. Undo relies on the same guarantee,
 /// so undoing into a folder that has since gained a same-named file is safe.
+///
+/// **`move(_:into:)` serializes process-wide and can block for a long time, so
+/// never call it on the main actor.** Every `FileMover` in the process shares
+/// one lock (see `criticalSection`), and that lock is held across the move
+/// itself — which for a large file across volumes is a full copy, and for a
+/// contended one is however long the other caller takes. This is the fact a
+/// caller needs in order to decide where to call it from, and its absence from
+/// this doc is why `AppState` needed an amendment to get its moves off the main
+/// actor after the fact.
 public struct FileMover: Sendable {
     /// Bound on retries after a lost name-collision race (see `move(_:into:)`).
     /// Small and fixed: enough to absorb contention against something outside

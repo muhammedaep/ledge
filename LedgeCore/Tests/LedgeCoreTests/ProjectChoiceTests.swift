@@ -92,3 +92,31 @@ import Foundation
     #expect(choice.wasAlreadyKnown == true)
     #expect(choice.projects.count == 1)
 }
+
+/// `id` is load-bearing and its participation in `==` was never pinned.
+///
+/// `updateProjects` removes a project by filtering on `id`, and the shelf's
+/// destination menu marks the active row by comparing `activeProject?.id`. Two
+/// projects can legitimately share a name and a folder — `Project(folder:)`
+/// mints a fresh id on every call, which is the whole reason `choosing` exists —
+/// so an `==` narrowed to name and folder would compile, read as reasonable, and
+/// quietly make those two operations hit the wrong row.
+@Test func twoProjectsForTheSameFolderAreNotEqualIfTheirIdsDiffer() {
+    let folder = URL(fileURLWithPath: "/tmp/Work", isDirectory: true)
+    let one = Project(folder: folder)
+    let other = Project(folder: folder)
+
+    #expect(one.id != other.id, "Project(folder:) mints a fresh id, which is the premise here")
+    #expect(one.name == other.name)
+    #expect(one.folder == other.folder)
+    #expect(one != other, "id has to count, or removal and menu selection pick by name alone")
+}
+
+@Test func aProjectEqualsItselfAcrossACopy() {
+    let original = Project(folder: URL(fileURLWithPath: "/tmp/Work", isDirectory: true))
+    var copy = original
+    #expect(copy == original)
+
+    copy.name = "Renamed"
+    #expect(copy != original, "name counts too")
+}
