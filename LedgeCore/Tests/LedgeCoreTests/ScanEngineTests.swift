@@ -71,3 +71,19 @@ private let rules = RuleSet(categories: [
     let names = try FileManager.default.contentsOfDirectory(atPath: temp.url.path)
     #expect(names == ["a.png"], "plan() must not move or create anything")
 }
+
+/// A file can vanish between the directory listing and the per-entry stat —
+/// a download gets cancelled, or the user deletes something while the
+/// Organize Now preview is being built. Simulated deterministically via an
+/// injected provider instead of racing a real deletion against the scan.
+@Test func aVanishedEntryIsSkippedNotForceUnwrapped() throws {
+    let temp = try TempDirectory()
+    try temp.writeFile("a.png")
+    try temp.writeFile("ghost.mp4")
+
+    let plan = ScanEngine.plan(folder: temp.url, using: rules) { url in
+        url.lastPathComponent == "ghost.mp4" ? nil : FileFacts(url: url)
+    }
+
+    #expect(plan.map(\.source.lastPathComponent) == ["a.png"])
+}
