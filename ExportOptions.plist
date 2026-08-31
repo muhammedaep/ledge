@@ -10,9 +10,10 @@
     <key>signingStyle</key>
     <string>automatic</string>
 
-    <!-- Hardened runtime is a notarization requirement. The project already
-         sets ENABLE_HARDENED_RUNTIME, and this keeps the export from quietly
-         dropping it. -->
+    <!-- Write the signed app to disk rather than uploading it to Apple. The
+         notarization step is a separate `notarytool submit` on the DMG.
+         (Hardened runtime, which notarization requires, is not set here — it
+         comes from ENABLE_HARDENED_RUNTIME in the project's build settings.) -->
     <key>destination</key>
     <string>export</string>
 

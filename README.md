@@ -101,15 +101,20 @@ Files and Folders.
 
 ## Installing
 
-There is no release build yet. Until there is, [build from source](#building).
+There is no release build yet. Until there is, [build from source](#building) —
+an app you built yourself opens normally, with no Gatekeeper prompt and nothing
+to click past. Gatekeeper gates on the quarantine flag that a *browser* attaches
+to a download, and a local build never has one.
 
-Because such a build is unsigned (or only ad-hoc signed), Gatekeeper will refuse
-it on a normal double-click. **Right-click the app → Open**, then confirm, once —
-after that it opens normally. Once notarized releases exist this step goes away.
+That changes the day there is something to download. An unsigned or
+ad-hoc-signed release, fetched from a browser, will be refused on a normal
+double-click: **right-click the app → Open**, then confirm, once — after that it
+opens normally. A notarized release needs none of that, which is the point of
+notarizing it.
 
-The release path itself is written and checked in (`make dmg`, `make notarize`);
-it just hasn't been run, because the Apple Developer Program enrolment behind it
-is still activating.
+The release path is written and checked in (`make dmg`, `make notarize`); it
+just hasn't been run, because the Apple Developer Program enrolment behind it is
+still activating.
 
 ## Configuration
 

@@ -96,7 +96,10 @@ notarize: require-notary dmg
 # Worth running before publishing: `spctl` is the check that answers the
 # question users actually care about — whether Gatekeeper opens it without a
 # right-click.
-verify:
+#
+# Depends on export-app so it can never be pointed at an absent
+# $(EXPORT)/$(APP).app and report success on a path that isn't there.
+verify: export-app
 	codesign --verify --deep --strict --verbose=2 $(EXPORT)/$(APP).app
 	spctl --assess --type exec --verbose=2 $(EXPORT)/$(APP).app
 
