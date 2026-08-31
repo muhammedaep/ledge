@@ -11,7 +11,7 @@ public final class MoveJournal {
     public init(directory: URL, cap: Int = 200) {
         self.directory = directory
         self.cap = cap
-        self.storage = Self.read(from: directory.appendingPathComponent("journal.json"))
+        self.storage = Self.read(from: directory.appendingPathComponent(Self.fileName))
     }
 
     public static func applicationSupport(cap: Int = 200) -> MoveJournal {
@@ -21,7 +21,8 @@ public final class MoveJournal {
         return MoveJournal(directory: base, cap: cap)
     }
 
-    private var fileURL: URL { directory.appendingPathComponent("journal.json") }
+    private static let fileName = "journal.json"
+    private var fileURL: URL { directory.appendingPathComponent(Self.fileName) }
 
     public var records: [MoveRecord] { storage }
 

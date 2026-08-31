@@ -69,3 +69,38 @@ private func record(_ name: String, batchID: UUID? = nil, date: Date = Date()) -
     try journal.remove(batchID: batch)
     #expect(journal.records.map(\.originalName) == ["solo.png"])
 }
+
+@Test func removingByIdPersistsAcrossReload() throws {
+    let temp = try TempDirectory()
+    let journal = MoveJournal(directory: temp.url)
+    let target = record("a.png")
+    try journal.append(target)
+    try journal.append(record("b.png"))
+
+    try journal.remove(id: target.id)
+
+    // A fresh instance over the same directory must not see the removed record.
+    #expect(MoveJournal(directory: temp.url).records.map(\.originalName) == ["b.png"])
+}
+
+@Test func removingByBatchIdPersistsAcrossReload() throws {
+    let temp = try TempDirectory()
+    let journal = MoveJournal(directory: temp.url)
+    let batch = UUID()
+
+    try journal.append(record("a.png", batchID: batch))
+    try journal.append(record("b.png", batchID: batch))
+    try journal.append(record("solo.png"))
+
+    try journal.remove(batchID: batch)
+
+    // A fresh instance over the same directory must not see the removed batch.
+    #expect(MoveJournal(directory: temp.url).records.map(\.originalName) == ["solo.png"])
+}
+
+@Test func corruptJournalFileLoadsAsEmpty() throws {
+    let temp = try TempDirectory()
+    try temp.writeFile("journal.json", contents: "not valid json")
+
+    #expect(MoveJournal(directory: temp.url).records.isEmpty)
+}
