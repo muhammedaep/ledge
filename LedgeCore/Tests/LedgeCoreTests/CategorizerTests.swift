@@ -97,6 +97,27 @@ func anyPackageDirectoryMatchesWhenARuleClaimsItsExtension(ext: String) {
     #expect(result.category == "Other")
 }
 
+/// The project's oldest structural rule, asserted end to end against a real
+/// directory: a folder merely *named* like a file is not that file type.
+///
+/// Everything else pins this in two halves — `factsReportABrowsableFolderAsNotAPackage`
+/// checks that a real `footage.mp4` directory reports `isPackage == false`, and
+/// `directoryFallsBackEvenWhenItsNameLooksLikeAnExtension` checks that facts
+/// shaped that way fall back — and two halves can drift apart without either of
+/// them failing. This goes from a directory on disk, through the real
+/// `FileFacts(url:)`, out the far side of `Categorizer`.
+@Test func aRealFolderNamedLikeAVideoIsNotFiledAsAVideo() throws {
+    let temp = try TempDirectory()
+    let folder = try temp.makeDirectory("footage.mp4")
+
+    let facts = try #require(FileFacts(url: folder))
+    let rules = RuleSet(categories: [Category(name: "Videos", extensions: ["mp4"])])
+    let result = Categorizer.destination(for: facts, in: temp.url, using: rules)
+
+    #expect(result.category == "Other")
+    #expect(result.folder == temp.url.appendingPathComponent("Other"))
+}
+
 @Test func byExtensionSubdivisionAddsAnUppercasedSubfolder() {
     let rules = RuleSet(categories: [
         Category(name: "Images", extensions: ["png"], subdivision: .byExtension)

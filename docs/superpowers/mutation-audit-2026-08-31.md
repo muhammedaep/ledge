@@ -6,13 +6,15 @@ written specifically as a guard passed with the very bug it was guarding against
 restored. This document is the standing record of which tests actually
 discriminate, and what was done about the ones that did not.
 
-It has two parts:
+It has three parts:
 
 - **Part 1** is the original audit (45 mutations, 11 survivors) as recorded in
   `.superpowers/sdd/2026-08-31-ledge/mutation-audit-core.md`.
 - **Part 2** is this task's work: every survivor closed or explicitly justified,
   each new test demonstrated *red* against the mutation it targets before being
   accepted.
+- **Part 3** is `ProjectStore`, which the brief named but the original audit did
+  not reach: 4 mutations, 3 killed, 1 survived.
 
 **Method.** `git worktree add --detach 98566aa /tmp/ledge-11b-mut`; all mutation
 work in that checkout, never in the repository. One mutation applied at a time
@@ -36,10 +38,15 @@ was removed afterwards.
 | MoveJournal | 8 | 1 | J7 |
 | UndoService | 6 | **0** | — |
 | DirectorySnapshot | 5 | 2 | D3, D4 |
+| ProjectStore | — | — | **not covered — see Part 3** |
 
 The killed mutations and the reasoning behind each survivor are in the original
 file and are not repeated here. `UndoService` was clean — all six mutations
 killed, four by a sole killer — and was left alone.
+
+`ProjectStore` is named in the brief's "cover at minimum" table but was missing
+from the original audit, which covered six components rather than seven. It is
+audited in Part 3 below.
 
 ---
 
@@ -582,3 +589,57 @@ and each is covered by the tests listed above.
 | `Moving/FileMover.swift` | injected `performMove`; `maxCollisionRetries` and `isNameCollision` made `internal` | F3, F9, F10, and the F2 reliability fix |
 | `Watching/DirectorySnapshot.swift` | comments recording which option is load-bearing and which is a signpost | D3, D4 |
 | `Watching/DownloadSettler.swift` | `.cancelled` doc comment corrected | Task 9 |
+
+---
+
+# Part 3 — ProjectStore
+
+`ProjectStore` is named in the brief's "cover at minimum" table and was missing
+from this record. The gap was in the record, not in the tests. Four mutations
+run here — the brief's two, and two of my own — every one of them executed
+against the suite rather than transcribed from anyone else's result.
+
+| # | Mutation | Result | Killed by |
+| --- | --- | --- | --- |
+| P1 | `load()` returns the list reversed (drop order preservation) | KILLED | `orderIsPreservedAcrossReload`, `savedProjectsAreLoadedBack` |
+| P2 | `load()` returns `[]` on a valid file | KILLED | `orderIsPreservedAcrossReload`, `savedProjectsAreLoadedBack` |
+| P3 | `save()` drops `createDirectory` | KILLED | `projectStoreSaveCreatesTheDirectoryIfMissing` (sole) |
+| P4 | `applicationSupport()` points at the wrong folder | **SURVIVED** | — |
+
+**Totals: 4 mutations, 3 killed, 1 survived.**
+
+The brief's two both die, and to two tests each rather than one — `Project` is
+`Equatable`, so `savedProjectsAreLoadedBack` compares whole values rather than a
+count, which is what lets it catch a reordering as well as a wipe. That is the
+same property that was missing from `journalSurvivesReload` before this audit.
+
+P3 was chosen as the `ProjectStore` counterpart of R3, and behaves the same way:
+one test, sole killer.
+
+### Survivor P4 — `applicationSupport()` is unverified in all three stores
+
+Changing the folder that `ProjectStore.applicationSupport()` points at kills
+nothing. Nothing constructs that factory in a test, because nothing can: it
+resolves `~/Library/Application Support/Ledge`, and exercising it would write
+into the user's real home directory. Every test in this suite goes through
+`TempDirectory` precisely so that never happens.
+
+This is **not specific to `ProjectStore`.** `RulesStore.applicationSupport()`
+and `MoveJournal.applicationSupport()` build the same path in the same way and
+are equally unverified. The consequence of a drift is not loud: one store
+disagreeing with the others about the folder name means the app comes up with
+an empty list, having silently left the user's real data where it was.
+
+**Left open deliberately, and it is closable.** A test would not have to touch
+the filesystem at all — the useful assertion is that the three factories agree
+with each other, which is a pure comparison of derived URLs. It needs
+`directory` widened from `private` to `internal` in the three stores. That is a
+production visibility change in three files at the tail of an approved task, so
+it is recorded here as a decision rather than taken unilaterally.
+
+Recorded, not closed:
+
+```
+Mutation: applicationSupport() .appendingPathComponent("Ledge") -> "Ledge-typo"
+✔ Test run with 111 tests passed        <- nothing notices
+```

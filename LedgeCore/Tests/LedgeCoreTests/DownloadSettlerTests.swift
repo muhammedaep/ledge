@@ -79,6 +79,14 @@ private final class SizeReads: @unchecked Sendable {
     // sentinel. Under the short ceiling the bug is cut off mid-loop, so both
     // assertions below fire, the count now pinning sampling shape rather than
     // carrying the load alone.
+    // The 20ms ceiling covers one thing that is not free of the clock: the gap
+    // between computing the deadline and the loop's first check of it, which is
+    // a single closure call. A scheduler stall longer than that yields a
+    // spurious .gaveUp — deliberately the safe direction, because it makes this
+    // test *fail* rather than pass for the wrong reason. Do not "fix" such a
+    // failure by widening the ceiling: past one sample interval it stops
+    // discriminating at all, and the load-dependence this construction exists
+    // to remove comes straight back.
     let reads = SizeReads(returning: 4)
     let settler = DownloadSettler(
         sampleInterval: .milliseconds(200),
