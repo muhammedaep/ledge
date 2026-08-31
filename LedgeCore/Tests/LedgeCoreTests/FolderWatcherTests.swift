@@ -198,6 +198,42 @@ import Foundation
     #expect(!watcher.isReconnectTimerRunningForTesting, "the poll must stop once nothing is left to reconnect")
 }
 
+@Test func stopCancelsTheReconnectTimerEvenWhileAFolderIsUnavailable() throws {
+    // Finding 3 (round 4): stopLocked already cancels reconnectTimer, but
+    // nothing asserted that directly for the case that actually matters —
+    // stop() called while a folder is still missing. Without that cancel, a
+    // watcher stopped mid-outage would keep waking the machine every
+    // reconnectPollInterval forever, never noticing it was supposed to be
+    // dead. (Checked first: this production code path already cancels the
+    // timer — see stopLocked in FolderWatcher.swift — so this is a coverage
+    // gap, not a live lifecycle bug.)
+    let missing = URL(fileURLWithPath: "/tmp/ledge-missing-\(UUID().uuidString)")
+    let watcher = FolderWatcher(folders: [missing]) { _ in }
+    watcher.start()
+
+    #expect(watcher.isReconnectTimerRunningForTesting, "a missing folder must start the poll")
+
+    watcher.stop()
+
+    #expect(
+        !watcher.isReconnectTimerRunningForTesting,
+        "stop() must cancel the reconnect poll even while a folder is unavailable")
+}
+
+@Test func waitUntilRecordsAnIssueRatherThanReturningSilentlyOnTimeout() async throws {
+    // Finding 2 (round 4): waitUntil used to return silently once its
+    // timeout elapsed with the condition still false — this surfaced when
+    // an unrelated mutation made a condition never become true and the
+    // whole 18-test file went from 1.7s to 6.6s and *still passed*. A
+    // helper that turns a hung condition into a quiet wait can disarm
+    // every test that uses it, invisibly. withKnownIssue fails this test
+    // if `waitUntil` does NOT record an issue inside it — i.e. it would
+    // have caught the old silent-return behavior directly.
+    await withKnownIssue("a condition that never becomes true must record an issue, not return quietly") {
+        try await waitUntil(timeout: .milliseconds(50)) { false }
+    }
+}
+
 @Test func duplicateWatchedFolderDoesNotLeakADescriptor() async throws {
     // Finding 5a: a duplicate URL in `folders` used to overwrite watches[folder]
     // with a second descriptor/source without cancelling the first, leaking it
@@ -452,6 +488,18 @@ import Foundation
     // actually run, whatever its outcome) rather than sleeping past the
     // settle delay; then recreate the folder and write a file — if the poll
     // got resurrected, it reconnects and reports it.
+    //
+    // Round 4: waitUntil now fails loudly on timeout (finding 2) instead of
+    // returning silently, and that surfaced a real, understood latency
+    // source here that used to be masked: `concurrentStartAndDeliveryGenerationChecksDoNotRace`,
+    // elsewhere in this file, deliberately saturates the process for a
+    // fixed 3-second window (that's what makes its own race reproducible),
+    // and this file's tests run in parallel by default. A real filesystem
+    // event landing on `queue` can be delayed for the length of that
+    // window under bad scheduling luck. The waits below use 15s — 5x that
+    // known, bounded window — rather than an arbitrary bump; confirmed by
+    // running the full suite repeatedly afterward (see the report) rather
+    // than assumed.
     let temp = try TempDirectory()
     try temp.writeFile("pre-existing.png")
 
@@ -466,22 +514,22 @@ import Foundation
     watcher.start()
 
     try FileManager.default.removeItem(at: temp.url.appendingPathComponent("pre-existing.png"))
-    try await waitUntil(timeout: .seconds(5)) { watcher.hasPendingEmptinessSettleForTesting }
+    try await waitUntil(timeout: .seconds(15)) { watcher.hasPendingEmptinessSettleForTesting }
 
     try FileManager.default.removeItem(at: temp.url) // now a clean single-step removal of an already-empty directory
-    try await waitUntil(timeout: .seconds(5)) { watcher.unavailableFolders.contains(temp.url) }
+    try await waitUntil(timeout: .seconds(15)) { watcher.unavailableFolders.contains(temp.url) }
 
     watcher.stop()
 
-    try await waitUntil(timeout: .seconds(5)) { !watcher.hasPendingEmptinessSettleForTesting }
+    try await waitUntil(timeout: .seconds(15)) { !watcher.hasPendingEmptinessSettleForTesting }
 
     #expect(watcher.descriptorLeakBalanceForTesting == 0, "a stopped watcher must not reopen a descriptor")
 
     try FileManager.default.createDirectory(at: temp.url, withIntermediateDirectories: true)
-    try await Task.sleep(for: .milliseconds(700)) // time for a resurrected poll (20ms interval) to reconnect
+    try await Task.sleep(for: .milliseconds(1500)) // time for a resurrected poll (20ms interval) to reconnect
 
     try "z".write(to: temp.url.appendingPathComponent("after-stop.png"), atomically: true, encoding: .utf8)
-    try await Task.sleep(for: .milliseconds(700)) // time for a resurrected live watch to report it
+    try await Task.sleep(for: .milliseconds(1500)) // time for a resurrected live watch to report it
 
     #expect(watcher.descriptorLeakBalanceForTesting == 0, "a stopped watcher must not reopen a descriptor")
     #expect(!box.names.contains("after-stop.png"), "a stopped watcher must not resurrect and emit")
@@ -526,51 +574,51 @@ import Foundation
 }
 
 @Test func concurrentStartAndDeliveryGenerationChecksDoNotRace() async throws {
-    // Finding 3 (round 3): the delivery closure's generation check
-    // deliberately reads `self.generation` via `queue.sync` so that read is
-    // synchronized against concurrent bumps from start()/stop(). A plain,
-    // unsynchronized read is a real data race that ordinary testing (and
-    // light concurrent hammering) does not reliably surface, because a torn
-    // read of an Int rarely produces an externally observable wrong value.
-    // Under Thread Sanitizer:
+    // Finding 3 (round 3), fixed in round 4: the delivery closure's
+    // generation check deliberately reads `self.generation` via
+    // `queue.sync` so that read is synchronized against concurrent bumps
+    // from start()/stop(). A plain, unsynchronized read is a real data race
+    // that ordinary testing does not reliably surface, because a torn read
+    // of an Int rarely produces an externally observable wrong value. Under
+    // Thread Sanitizer:
     //   swift test --sanitize thread --filter concurrentStartAndDeliveryGenerationChecksDoNotRace
     //
-    // Stated plainly: on this session's machine, removing the queue.sync
-    // here did not reproduce a TSan warning across roughly 18 attempts
-    // (two constructions tried — 300 paired write/start tasks, and this
-    // continuous-start-loop variant), while the unmutated version was
-    // confirmed clean across multiple runs, as required. The fix itself is
-    // unambiguously correct and follows the same pattern already proven to
-    // matter for `unavailableFolders` in round one (that mutation reliably
-    // produces TSan warnings there). Race reproduction under TSan is
-    // inherently probabilistic and scheduler-dependent; this test's
-    // construction — genuine concurrent pressure on both the write side
-    // (start()) and the read side (a real write's resulting delivery) of
-    // the exact same field — is the right shape to catch it if the
-    // scheduler cooperates, even though it didn't on this run. Widening it
-    // further (thousands of tasks) made the test impractically slow
-    // (30+ seconds) without confirmed success, so it was not pursued
-    // further.
+    // Round 3's construction (a tight, unpaced start() loop) never actually
+    // exercised the mutated line: restarting that fast re-baselines
+    // `snapshots` on every iteration (attachLocked takes a fresh scan as
+    // the baseline whenever it isn't a reconnect), so by the time any
+    // write's rescan runs, its files are already folded into the baseline
+    // and `newEntries` is empty — commitLocked returns at
+    // `guard !new.isEmpty` before ever reaching `deliveryQueue.async`. A
+    // counter at the guard measured zero reads under that construction; it
+    // was structurally incapable of failing regardless of the mutation.
+    //
+    // Fixed by pacing the restarts so real deliveries have room to form
+    // between them: one task calls start() roughly every 500 microseconds
+    // rather than as fast as possible, while another writes files
+    // unthrottled for the same 3-second window — long enough for files
+    // written between two starts to be diffed as genuinely new before the
+    // next start() resets the baseline again.
     let temp = try TempDirectory()
     let folderURL = temp.url // a plain Sendable URL, unlike TempDirectory itself
     let watcher = FolderWatcher(folders: [temp.url]) { _ in }
     watcher.start()
     defer { watcher.stop() }
 
+    let deadline = Date().addingTimeInterval(3)
     await withTaskGroup(of: Void.self) { group in
-        // One task hammers start() continuously and rapidly for the whole
-        // window (rather than 300 one-shot concurrent calls, which Swift's
-        // cooperative thread pool time-slices rather than truly overlapping
-        // for the full duration) while the others write real files — this
-        // keeps `generation` under continuous write pressure for as long as
-        // the write-triggered deliveries take to arrive and read it.
         group.addTask {
-            for _ in 0..<300 { watcher.start() }
+            while Date() < deadline {
+                watcher.start()
+                usleep(500)
+            }
         }
-        for i in 0..<300 {
-            group.addTask {
+        group.addTask {
+            var i = 0
+            while Date() < deadline {
                 let fileURL = folderURL.appendingPathComponent("race-\(i).png")
                 try? "x".write(to: fileURL, atomically: true, encoding: .utf8)
+                i += 1
             }
         }
     }
@@ -604,8 +652,20 @@ private final class Box: @unchecked Sendable {
     }
 }
 
+/// Polls `condition` until it becomes true or `timeout` elapses.
+///
+/// Round 4, finding 2: this used to return silently on timeout — a
+/// mutation elsewhere once made a condition never become true, and the
+/// affected test just got slower (1.7s -> 6.6s) while still passing. A
+/// helper that turns a hung condition into a quiet wait can disarm every
+/// test that uses it, invisibly. It now records a failure via
+/// `Issue.record` instead, so a timeout is a red test, not a slow green
+/// one. `sourceLocation` defaults to the call site (not this line) so the
+/// failure points at the test that actually hung, matching how `#expect`
+/// already behaves.
 private func waitUntil(
     timeout: Duration,
+    sourceLocation: SourceLocation = #_sourceLocation,
     _ condition: @escaping () -> Bool
 ) async throws {
     let deadline = ContinuousClock.now.advanced(by: timeout)
@@ -613,6 +673,8 @@ private func waitUntil(
         if condition() { return }
         try await Task.sleep(for: .milliseconds(50))
     }
+    if condition() { return }
+    Issue.record("waitUntil timed out after \(timeout)", sourceLocation: sourceLocation)
 }
 
 /// Whether `descriptor` is currently open on `url`, checked by identity
