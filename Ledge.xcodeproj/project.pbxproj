@@ -18,6 +18,8 @@
 		A1B2C3D400114455AA660011 /* GeneralPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660010 /* GeneralPane.swift */; };
 		A1B2C3D400114455AA660013 /* PermissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660012 /* PermissionView.swift */; };
 		A1B2C3D400114455AA660016 /* RulesPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660015 /* RulesPane.swift */; };
+		A1B2C3D400114455AA660018 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660017 /* Localizable.xcstrings */; };
+		A1B2C3D400114455AA66001B /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66001A /* InfoPlist.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +34,8 @@
 		A1B2C3D400114455AA660010 /* GeneralPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralPane.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA660012 /* PermissionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionView.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA660015 /* RulesPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesPane.swift; sourceTree = "<group>"; };
+		A1B2C3D400114455AA660017 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		A1B2C3D400114455AA66001A /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,8 +68,18 @@
 				A1B2C3D400114455AA66000E /* Organize */,
 				A1B2C3D400114455AA660014 /* Onboarding */,
 				A1B2C3D400114455AA66000F /* Settings */,
+				A1B2C3D400114455AA660019 /* Resources */,
 			);
 			path = Ledge;
+			sourceTree = "<group>";
+		};
+		A1B2C3D400114455AA660019 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D400114455AA660017 /* Localizable.xcstrings */,
+				A1B2C3D400114455AA66001A /* InfoPlist.xcstrings */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		19C7F09942DB4C26BB9C6052 /* Shelf */ = {
@@ -156,6 +170,7 @@
 			knownRegions = (
 				en,
 				Base,
+				tr,
 			);
 			mainGroup = 7A6E829AE29041289A771044;
 			packageReferences = (
@@ -175,6 +190,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D400114455AA660018 /* Localizable.xcstrings in Resources */,
+				A1B2C3D400114455AA66001B /* InfoPlist.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

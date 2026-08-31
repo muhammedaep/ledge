@@ -1,0 +1,24 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSDownloadsFolderUsageDescription" : {
+      "comment" : "Shown by macOS in the consent dialog that grants Ledge access to Downloads. Set in English by INFOPLIST_KEY_NSDownloadsFolderUsageDescription; this catalog only translates it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ledge files new downloads into folders for you."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ledge, yeni indirilenleri sizin için klasörlere yerleştirir."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
