@@ -373,10 +373,105 @@ now, multi-folder, subdivision). This is a full v1, not a minimal one.
 *Mitigation:* the implementation plan sequences it so there is a working, useful app after
 the shelf and automatic filing land; the rest are additive.
 
-## 13. Deferred to v2
+## 13. Project mode
+
+*Added 2026-08-31, during implementation, at the author's request.*
+
+### 13.1 The problem it solves
+
+The motivating user is a video editor. When working on a project, most of what
+they download belongs to that project — footage, voiceovers, logos, templates.
+Today those files land in `~/Downloads`, get filed by type, and are then moved
+by hand into the project folder. This is exactly the chore that produced the
+`Copied_Serhat abi` collection: twenty-five files gathered one at a time.
+
+Project mode files them there in the first place.
+
+### 13.2 Behaviour
+
+The user designates a folder as the active project. While a project is active,
+new downloads are filed **into that folder** instead of into the watched folder,
+using the same rules — so a project gains `Images/`, `Videos/`, `Audio/`,
+`Design/` subfolders exactly as `~/Downloads` would.
+
+Only the filing *root* changes. Nothing else does:
+
+- `MoveRecord.from` remains the folder the file was found in (`~/Downloads`), so
+  undo still returns the file there. Undo semantics are unchanged.
+- The rule set is global. There is no per-project rule set in v1.
+- Organize Now still operates on watched folders, not on projects.
+
+### 13.3 Selecting a project
+
+The shelf gains a header row naming the current destination:
+
+```
+┌──────────────────────────────┐
+│ Filing into:                 │
+│ ▸ Summit 2026            ▾   │
+├──────────────────────────────┤
+│ Recent Downloads             │
+│ ▶ logo.png       Images      │
+└──────────────────────────────┘
+```
+
+The dropdown lists Downloads (the default), every known project, and
+"Choose Project…" which opens a folder picker and adds it to the list.
+
+A selection **persists until the user changes it** — no timer. Two things guard
+against forgetting it is on:
+
+1. The shelf header always names the destination, at the top, before the file list.
+2. The menu bar icon changes shape while a project is active (`folder.fill`
+   rather than `tray.and.arrow.down`), so the state is visible without opening
+   anything.
+
+A timed auto-expiry was considered and rejected: a long editing session is
+exactly when the project stays active longest, so a timer would deactivate it
+at the worst moment and produce a "why didn't that download go to the project"
+mystery.
+
+### 13.4 Data model
+
+```swift
+public struct Project: Codable, Identifiable, Equatable, Sendable {
+    public let id: UUID
+    public var name: String    // defaults to folder.lastPathComponent
+    public var folder: URL
+}
+```
+
+Stored by `ProjectStore` in `~/Library/Application Support/Ledge/projects.json`,
+mirroring `RulesStore`. The active project is held as an `activeProjectID: UUID?`
+in `UserDefaults`; `nil` means "file into the watched folder", which is the
+default and the state after a fresh install.
+
+### 13.5 Failure handling
+
+If the active project's folder no longer exists or is on an unmounted volume,
+Ledge **does not recreate it**. It falls back to the watched folder for that
+file, surfaces the reason in the shelf, and clears the active project. Silently
+recreating a deleted project folder would scatter files into a directory the
+user deliberately removed; silently continuing to target an unmounted volume
+would fail every download until noticed.
+
+### 13.6 Settings
+
+The General pane gains a Projects section: add, rename, and remove projects.
+Removing a project that is currently active resets the destination to Downloads.
+
+## 14. Deferred to v2
 
 - Content- and metadata-based rules (EXIF, resolution, PDF text).
-- Per-folder rule sets (v1 uses one global rule set for all watched folders).
+- Per-folder and per-project rule sets (v1 uses one global rule set).
 - Rule import/export and sharing.
 - Recursive watching of subdirectories.
 - Localizations beyond English and Turkish.
+- **Bookmark-based file tracking.** When the user moves a filed file elsewhere
+  themselves, its shelf row goes stale: it dims, drag is disabled, and undo
+  reports the file is no longer at its recorded path. Tracking the file by
+  `URL.bookmarkData()` would follow it across moves and renames on the same
+  volume, keeping the row live. Deferred because project mode addresses the
+  reason files get moved out of `~/Downloads` in the first place — if downloads
+  land in the project to begin with, there is no later move to track.
+  Reconsider if stale rows prove common in real use.
