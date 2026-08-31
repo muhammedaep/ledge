@@ -134,11 +134,39 @@ public struct FileMover: Sendable {
         error.domain == NSCocoaErrorDomain && error.code == CocoaError.fileWriteFileExists.rawValue
     }
 
+    /// Whether *any* directory entry sits at `path` — including a symlink whose
+    /// target is gone.
+    ///
+    /// `FileManager.fileExists` resolves symlinks, so it answers `false` for a
+    /// dangling link. `moveItem` does not agree: the link is still an entry in
+    /// the folder, so it refuses the same path with `fileWriteFileExists`. Asked
+    /// via `fileExists`, `availableURL` therefore hands back a name the move
+    /// rejects — and because the name is recomputed identically on every pass,
+    /// the collision retry burns all five attempts on it and the item is left
+    /// unfileable until someone deletes the link by hand. Measured, not
+    /// theorised: a dangling link named `report.pdf` in the destination makes
+    /// `fileExists` report false, `lstat` report true, and `moveItem` fail with
+    /// Cocoa error 516.
+    ///
+    /// It also matters to Organize Now, where the plan is shown to the user
+    /// before anything moves: a preview must not offer a name the move will
+    /// refuse.
+    ///
+    /// `lstat` rather than a Foundation call because its contract is explicit
+    /// about not following the final link, which is the whole point here.
+    static func entryExists(atPath path: String) -> Bool {
+        var info = stat()
+        return lstat(path, &info) == 0
+    }
+
     /// The first free name in `folder` based on `name`.
+    ///
+    /// "Free" means no directory entry of any kind — see `entryExists`. A
+    /// dangling symlink is left alone rather than clobbered, which is the same
+    /// promise this type makes about every other item it finds in its way.
     public static func availableURL(for name: String, in folder: URL) -> URL {
-        let fm = FileManager.default
         let candidate = folder.appendingPathComponent(name)
-        guard fm.fileExists(atPath: candidate.path) else { return candidate }
+        guard entryExists(atPath: candidate.path) else { return candidate }
 
         let ext = (name as NSString).pathExtension
         let stem = (name as NSString).deletingPathExtension
@@ -147,7 +175,7 @@ public struct FileMover: Sendable {
         while true {
             let numbered = ext.isEmpty ? "\(stem) (\(counter))" : "\(stem) (\(counter)).\(ext)"
             let url = folder.appendingPathComponent(numbered)
-            if !fm.fileExists(atPath: url.path) { return url }
+            if !entryExists(atPath: url.path) { return url }
             counter += 1
         }
     }

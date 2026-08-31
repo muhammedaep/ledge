@@ -289,3 +289,59 @@ func isNameCollisionMatchesOnlyTheClobberRefusal(domain: String, code: Int, expe
     #expect(final == dest.appendingPathComponent("Project.app"))
     #expect(FileManager.default.fileExists(atPath: final.appendingPathComponent("inner.txt").path))
 }
+
+// MARK: - Dangling symlinks
+//
+// `FileManager.fileExists` resolves symlinks and so reports `false` for a link
+// whose target is gone, while `moveItem` still refuses to write over the link
+// itself. That disagreement used to make an occupied name look free: the move
+// was rejected with `fileWriteFileExists`, the retry recomputed the identical
+// name, and the item stayed unfileable for good. Organize Now made it worse by
+// showing the user that name in a preview first.
+
+@Test func aDanglingSymlinkStillOccupiesItsName() throws {
+    let temp = try TempDirectory()
+    let dest = try temp.makeDirectory("Documents")
+    try FileManager.default.createSymbolicLink(
+        atPath: dest.appendingPathComponent("a.pdf").path,
+        withDestinationPath: dest.appendingPathComponent("gone.pdf").path)
+
+    // The premise: Foundation's own existence check disagrees with the move.
+    #expect(!FileManager.default.fileExists(atPath: dest.appendingPathComponent("a.pdf").path),
+            "premise: fileExists resolves the link and calls the name free")
+
+    #expect(FileMover.availableURL(for: "a.pdf", in: dest).lastPathComponent == "a (1).pdf")
+}
+
+@Test func movingOntoADanglingSymlinkSucceedsAndLeavesTheLinkAlone() throws {
+    let temp = try TempDirectory()
+    let dest = try temp.makeDirectory("Documents")
+    let link = dest.appendingPathComponent("a.pdf")
+    try FileManager.default.createSymbolicLink(
+        atPath: link.path, withDestinationPath: dest.appendingPathComponent("gone.pdf").path)
+    let source = try temp.writeFile("a.pdf", contents: "incoming")
+
+    let final = try FileMover().move(source, into: dest)
+
+    #expect(final.lastPathComponent == "a (1).pdf")
+    #expect(try String(contentsOf: final, encoding: .utf8) == "incoming")
+
+    // The link is the user's file too. Never overwritten — the same promise
+    // this type makes about everything else in its way.
+    var info = stat()
+    #expect(lstat(link.path, &info) == 0, "the dangling link must survive the move")
+}
+
+@Test func aLiveSymlinkIsNotFollowedAndItsTargetIsNotWrittenThrough() throws {
+    let temp = try TempDirectory()
+    let dest = try temp.makeDirectory("Documents")
+    let target = try temp.writeFile("real.pdf", contents: "target")
+    try FileManager.default.createSymbolicLink(
+        atPath: dest.appendingPathComponent("a.pdf").path, withDestinationPath: target.path)
+    let source = try temp.writeFile("nested/a.pdf", contents: "incoming")
+
+    let final = try FileMover().move(source, into: dest)
+
+    #expect(final.lastPathComponent == "a (1).pdf")
+    #expect(try String(contentsOf: target, encoding: .utf8) == "target")
+}
