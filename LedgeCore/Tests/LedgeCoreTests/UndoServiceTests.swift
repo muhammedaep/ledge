@@ -73,3 +73,35 @@ import Foundation
     #expect(FileManager.default.fileExists(atPath: temp.url.appendingPathComponent("b.png").path))
     #expect(journal.records.isEmpty)
 }
+
+@Test func undoBatchKeepsTheJournalRecordForAFileItCouldNotRestore() throws {
+    let temp = try TempDirectory()
+    let mover = FileMover()
+    let journal = MoveJournal(directory: temp.url)
+    let batch = UUID()
+    let dest = temp.url.appendingPathComponent("Images", isDirectory: true)
+
+    var records: [MoveRecord] = []
+    for name in ["a.png", "b.png", "c.png"] {
+        let moved = try mover.move(try temp.writeFile(name), into: dest)
+        let record = MoveRecord(originalName: name, from: temp.url, to: moved, batchID: batch)
+        try journal.append(record)
+        records.append(record)
+    }
+
+    // "c.png" is gone from its recorded path before undo runs -- restored
+    // from Trash to somewhere else, resynced by iCloud/Dropbox, whatever the
+    // cause. undoBatch must skip it, not lose track of it.
+    let missing = records[2]
+    try FileManager.default.removeItem(at: missing.to)
+
+    let restored = try UndoService(mover: mover, journal: journal).undoBatch(batch)
+
+    #expect(restored.count == 2)
+    #expect(FileManager.default.fileExists(atPath: temp.url.appendingPathComponent("a.png").path))
+    #expect(FileManager.default.fileExists(atPath: temp.url.appendingPathComponent("b.png").path))
+
+    let remaining = journal.records(inBatch: batch)
+    #expect(remaining.map(\.id) == [missing.id], "the skipped file's record must survive so it stays individually undoable")
+    #expect(journal.records.count == 1)
+}

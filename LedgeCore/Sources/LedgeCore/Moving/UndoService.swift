@@ -27,15 +27,19 @@ public struct UndoService {
     }
 
     /// Undoes an Organize Now batch as one action. Records whose file has since
-    /// gone missing are skipped rather than aborting the whole batch.
+    /// gone missing are skipped rather than aborting the whole batch — and,
+    /// like `undo(_:)`, a skipped record is left in the journal rather than
+    /// dropped, so the user doesn't lose their only trail to a file that was
+    /// never actually put back (it stays individually undoable if it later
+    /// reappears, e.g. restored from Trash or resynced by iCloud/Dropbox).
     @discardableResult
     public func undoBatch(_ batchID: UUID) throws -> [URL] {
         var restored: [URL] = []
         for record in journal.records(inBatch: batchID) {
             guard FileManager.default.fileExists(atPath: record.to.path) else { continue }
             restored.append(try mover.move(record.to, into: record.from))
+            try journal.remove(id: record.id)
         }
-        try journal.remove(batchID: batchID)
         return restored
     }
 }
