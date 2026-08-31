@@ -54,13 +54,24 @@ struct PermissionView: View {
         blockedFolders.first?.lastPathComponent ?? String(localized: "Downloads")
     }
 
-    /// The pane is Privacy & Security › Files and Folders, where Ledge's own
-    /// row carries the folder switches. `Privacy_FilesAndFolders` is the anchor
-    /// the current Settings extension answers to; the pre-Ventura
-    /// `com.apple.preference.security?Privacy_Files` spelling is not one it
-    /// advertises any more, and a URL it doesn't recognise opens Settings on
-    /// whatever pane happens to be last.
     private func openPrivacySettings() {
+        PrivacySettings.open()
+    }
+}
+
+/// Where a blocked folder is granted.
+///
+/// The pane is Privacy & Security › Files and Folders, where Ledge's own row
+/// carries the folder switches. `Privacy_FilesAndFolders` is the anchor the
+/// current Settings extension answers to; the pre-Ventura
+/// `com.apple.preference.security?Privacy_Files` spelling is not one it
+/// advertises any more, and a URL it doesn't recognise opens Settings on
+/// whatever pane happens to be last.
+///
+/// Shared with the shelf's banner, which offers the same route when only some
+/// of the watched folders are blocked — one URL, so the two cannot drift.
+enum PrivacySettings {
+    static func open() {
         guard let url = URL(
             string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_FilesAndFolders"
         ) else { return }

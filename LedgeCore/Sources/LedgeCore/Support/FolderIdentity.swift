@@ -17,11 +17,16 @@ public enum FolderIdentity {
     /// `resolvingSymlinksInPath()` reads the filesystem, and — measured, not
     /// assumed; the tests pin it — leaves a path it cannot walk exactly as it
     /// found it rather than resolving the existing prefix. So two *different*
-    /// spellings of a folder that is gone do not compare equal. That is
-    /// survivable because of where spellings come from: an open panel can only
-    /// return a folder that exists, so every entry is resolved as it is added,
-    /// and comparisons between stored entries are already in the same form. A
-    /// folder that has been deleted or unmounted still compares equal to
+    /// spellings of a folder that is gone do not compare equal.
+    ///
+    /// What makes that survivable is *when* the resolution happens, not where
+    /// the URLs are stored. Callers store the URL they were handed — the open
+    /// panel's, verbatim — and this resolves at comparison time. So the
+    /// comparison that matters, "is this folder already in the list", is made
+    /// while the user is picking a folder that by definition exists, and both
+    /// sides resolve then. The stored spellings never have to agree.
+    ///
+    /// A folder that has been deleted or unmounted still compares equal to
     /// itself, which is what keeps it from being duplicated while it is away.
     public static func key(_ folder: URL) -> String {
         folder.standardizedFileURL.resolvingSymlinksInPath().path

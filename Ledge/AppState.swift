@@ -141,6 +141,10 @@ final class AppState {
     /// signal that suggests it may have moved — see `refreshFolderStatus()`.
     private(set) var folderStatus: [URL: FolderAccess] = [:]
 
+    /// Bumped by every `refreshFolderStatus()`; a sweep that finishes after a
+    /// later one started publishes nothing.
+    private var folderStatusGeneration = 0
+
     /// Watched folders that exist but cannot be read — a declined or
     /// never-granted TCC prompt. This is the one the user can actually fix by
     /// granting permission.
@@ -164,20 +168,49 @@ final class AppState {
     /// is what the user would be staring at.
     var hasFolderAccess: Bool { unreadableFolders.isEmpty }
 
+    /// Whether anything at all can still be filed.
+    ///
+    /// Not the same question as `hasFolderAccess`, and the difference decides
+    /// how much of the shelf is replaced. One blocked folder out of two means
+    /// filing still works from the other, so the list, its history and its undo
+    /// buttons are live and must stay on screen; only a banner is owed. The
+    /// full-screen explanation is for the case it was written for — nothing
+    /// coming in from anywhere.
+    ///
+    /// Unknown counts as usable, for the same reason as above.
+    var hasUsableFolder: Bool {
+        preferences.watchedFolders.isEmpty
+            || preferences.watchedFolders.contains { folderStatus[$0] == .readable || folderStatus[$0] == nil }
+    }
+
     /// Re-checks every watched folder, off the main actor.
     ///
     /// Called on launch, whenever the watched folders change, and from the shelf
     /// on the same signals that refresh row liveness — the popover opening is
     /// exactly when a stale answer would be seen.
+    ///
+    /// Those overlap: adding a folder starts a refresh while the shelf's own may
+    /// still be running. A plain assignment there is last-writer-wins, and the
+    /// older sweep — which never saw the new folder — would erase its entry. So
+    /// a superseded sweep publishes nothing, the way `FolderWatcher` drops a
+    /// delivery whose generation has moved on.
     func refreshFolderStatus() async {
+        folderStatusGeneration += 1
+        let generation = folderStatusGeneration
         let folders = preferences.watchedFolders
-        folderStatus = await Task.detached(priority: .userInitiated) {
+
+        let checked = await Task.detached(priority: .userInitiated) {
             var status: [URL: FolderAccess] = [:]
             for folder in folders {
                 status[folder] = FolderAccess.of(folder)
             }
             return status
         }.value
+
+        guard generation == folderStatusGeneration else { return }
+        // Keyed by identity, not by spelling, so an entry cannot outlive the
+        // folder it describes.
+        folderStatus = checked.filter { FolderIdentity.contains(preferences.watchedFolders, $0.key) }
     }
 
     /// Adding a folder that is already watched by another spelling would open a
@@ -196,7 +229,10 @@ final class AppState {
     func removeWatchedFolder(_ url: URL) {
         guard preferences.watchedFolders.count > 1 else { return }
         preferences.watchedFolders = FolderIdentity.removing(url, from: preferences.watchedFolders)
-        folderStatus[url] = nil
+        // Cleared by identity too. Keyed on the caller's spelling, an entry for
+        // the same folder written under a different spelling would survive the
+        // removal and keep reporting a folder that is no longer watched.
+        folderStatus = folderStatus.filter { !FolderIdentity.sameFolder($0.key, url) }
         startWatching()
         Task { await refreshFolderStatus() }
     }

@@ -38,10 +38,18 @@ struct ShelfView: View {
         // Monitor. That is worse than the problem the screen exists to explain,
         // and it was reachable by merely ejecting a drive.
         VStack(alignment: .leading, spacing: 0) {
-            if state.hasFolderAccess {
-                shelf
-            } else {
+            // Outside the branch for the same reason the footer is. A banner
+            // that lives inside the thing being replaced is silent in exactly
+            // the state it was written for: `lastError` set while the
+            // permission screen is up used to render nothing at all.
+            unavailableFolderBanner
+
+            errorBanner
+
+            if showsPermissionScreen {
                 PermissionView()
+            } else {
+                shelf
             }
 
             Divider()
@@ -79,13 +87,19 @@ struct ShelfView: View {
         }
     }
 
+    /// Whether the whole list is replaced by the explanation.
+    ///
+    /// Only when nothing is coming in from anywhere *and* permission is the
+    /// reason. One blocked folder alongside a working one leaves filing running,
+    /// so the list stays and the banner carries the news; every folder merely
+    /// missing is not a permission problem and gets the banner too.
+    private var showsPermissionScreen: Bool {
+        !state.hasUsableFolder && !state.unreadableFolders.isEmpty
+    }
+
     private var shelf: some View {
         VStack(alignment: .leading, spacing: 0) {
             destinationHeader
-
-            unavailableFolderBanner
-
-            errorBanner
 
             Text("Recent Downloads")
                 .font(.headline)
@@ -148,30 +162,44 @@ struct ShelfView: View {
         .padding(10)
     }
 
-    /// A watched folder that is simply *gone* — an ejected drive, a deleted
-    /// directory. Not a permission problem, so it must not raise the permission
-    /// screen: no consent dialog can grant a folder that is not there. Filing
-    /// carries on for every other watched folder, and this says which one
-    /// stopped and where to remove it.
+    /// Watched folders Ledge cannot file from, and why, for every case the
+    /// permission screen is not already up for.
+    ///
+    /// A folder that is simply *gone* — an ejected drive, a deleted directory —
+    /// is never a permission problem: no consent dialog can grant a folder that
+    /// is not there. A *blocked* folder is, but if another folder still works
+    /// then filing is still running and only a banner is owed; the full screen
+    /// would hide a live list to explain a partial failure.
     @ViewBuilder
     private var unavailableFolderBanner: some View {
-        let missing = state.missingFolders
-        if !missing.isEmpty {
+        // Whatever the permission screen is already saying does not need saying
+        // twice.
+        let blocked = showsPermissionScreen ? [] : state.unreadableFolders
+        let unavailable = state.missingFolders + blocked
+        if !unavailable.isEmpty {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "externaldrive.trianglebadge.exclamationmark")
+                Image(systemName: blocked.isEmpty
+                      ? "externaldrive.trianglebadge.exclamationmark"
+                      : "lock.fill")
                     .foregroundStyle(.orange)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(missing.count == 1
-                         ? String(localized: "A watched folder isn't there right now.")
-                         : String(localized: "\(missing.count) watched folders aren't there right now."))
+                    Text(unavailable.count == 1
+                         ? String(localized: "Ledge can't file from a watched folder right now.")
+                         : String(localized: "Ledge can't file from \(unavailable.count) watched folders right now."))
                         .font(.caption)
-                    Text(missing.map(\.lastPathComponent).joined(separator: ", "))
+                    Text(unavailable.map(\.lastPathComponent).joined(separator: ", "))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.head)
                 }
                 Spacer(minLength: 4)
+                // A blocked folder has somewhere to go that Settings isn't.
+                if !blocked.isEmpty {
+                    Button("Permission…") { PrivacySettings.open() }
+                        .buttonStyle(.borderless)
+                        .font(.caption)
+                }
                 SettingsLink { Text("Settings…").font(.caption) }
                     .buttonStyle(.borderless)
             }
