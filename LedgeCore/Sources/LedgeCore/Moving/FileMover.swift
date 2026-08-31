@@ -39,7 +39,10 @@ public struct FileMover: Sendable {
     /// Small and fixed: enough to absorb contention against something outside
     /// this process (Finder, another app) without spinning forever on a
     /// genuinely stuck destination.
-    private static let maxCollisionRetries = 5
+    ///
+    /// `internal` rather than `private` only so the retry tests can assert the
+    /// loop honours *this* bound rather than a number copied into the test.
+    static let maxCollisionRetries = 5
 
     /// Serializes the "pick a free name, then move onto it" critical section
     /// across every `FileMover` in this process.
@@ -60,7 +63,21 @@ public struct FileMover: Sendable {
     /// second line of defense against a collision from outside this process.
     private static let criticalSection = NSLock()
 
-    public init() {}
+    /// Performs the rename itself. Defaults to the real filesystem and only
+    /// needs overriding in tests: the retry loop below exists for a collision
+    /// arriving from *outside* this process, and the lock above guarantees no
+    /// in-process caller can ever produce one — so a test that does not stand
+    /// in for the rename cannot reach the retry at all. Injecting it also makes
+    /// the lock's own race a certainty rather than a scheduling accident.
+    private let performMove: @Sendable (URL, URL) throws -> Void
+
+    public init(
+        performMove: @escaping @Sendable (URL, URL) throws -> Void = {
+            try FileManager.default.moveItem(at: $0, to: $1)
+        }
+    ) {
+        self.performMove = performMove
+    }
 
     @discardableResult
     public func move(_ source: URL, into folder: URL) throws -> URL {
@@ -86,7 +103,7 @@ public struct FileMover: Sendable {
             let target = Self.availableURL(for: source.lastPathComponent, in: folder)
 
             do {
-                try fm.moveItem(at: source, to: target)
+                try performMove(source, target)
             } catch {
                 let nsError = error as NSError
                 attempt += 1
@@ -109,7 +126,11 @@ public struct FileMover: Sendable {
     /// Whether `error` is `moveItem` refusing to clobber an existing item at
     /// the destination, as opposed to an unrelated failure (disk full,
     /// permission denied, …) that a retry can't fix.
-    private static func isNameCollision(_ error: NSError) -> Bool {
+    ///
+    /// `internal` rather than `private` so it can be pinned directly: it is a
+    /// pure function, and broadening it to "any Cocoa error" would silently
+    /// turn a disk-full failure into six doomed retries.
+    static func isNameCollision(_ error: NSError) -> Bool {
         error.domain == NSCocoaErrorDomain && error.code == CocoaError.fileWriteFileExists.rawValue
     }
 

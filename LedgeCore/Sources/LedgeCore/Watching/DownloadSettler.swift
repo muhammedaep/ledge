@@ -9,10 +9,18 @@ public enum SettleResult: Equatable, Sendable {
     case ignored
     /// Still changing after the ceiling elapsed. Left alone.
     case gaveUp
-    /// The settle was cancelled before reaching a conclusion — the app quit,
-    /// or the watcher restarted because the user changed a watched folder.
-    /// Unlike the other four cases this says nothing about the file itself;
-    /// the caller should re-queue it once running again.
+    /// The settle was cancelled *while sampling*, before reaching a conclusion
+    /// — the app quit, or the watcher restarted because the user changed a
+    /// watched folder. Unlike the other four cases this says nothing about the
+    /// file itself; the caller should re-queue it once running again.
+    ///
+    /// Deliberately not the whole cancellation story: a settle cancelled inside
+    /// the coordinated read reports `.stillWriting` instead. Cancelling the
+    /// coordinator fails the pending read, and a failed coordination is
+    /// indistinguishable from a claim this settle genuinely lost — so the
+    /// conservative answer wins. Both mean the same thing to the caller ("do
+    /// not move it; ask again later"), which is why the distinction is not
+    /// worth inventing a fifth outcome for.
     case cancelled
 }
 

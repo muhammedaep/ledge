@@ -57,6 +57,23 @@ private let rules = RuleSet(categories: [
     #expect(plan[0].destination.category == "Apps")
 }
 
+/// The plan is built from a `Set`, whose iteration order is arbitrary and
+/// changes between runs. The preview list is a UI surface a user reads and
+/// re-reads while deciding, so it has to come back in the same order every
+/// time. Six entries, written in an order that is not the answer: an unsorted
+/// plan matching by luck is a 1-in-720 event.
+@Test func planIsOrderedByFileName() throws {
+    let temp = try TempDirectory()
+    for name in ["delta.png", "bravo.mp4", "foxtrot.png", "alpha.png", "charlie.mp4", "echo.png"] {
+        try temp.writeFile(name)
+    }
+
+    let plan = ScanEngine.plan(folder: temp.url, using: rules)
+
+    #expect(plan.map(\.source.lastPathComponent) ==
+            ["alpha.png", "bravo.mp4", "charlie.mp4", "delta.png", "echo.png", "foxtrot.png"])
+}
+
 @Test func planningAnEmptyFolderYieldsNothing() throws {
     let temp = try TempDirectory()
     #expect(ScanEngine.plan(folder: temp.url, using: rules).isEmpty)

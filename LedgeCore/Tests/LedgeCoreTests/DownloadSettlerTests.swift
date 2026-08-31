@@ -141,7 +141,63 @@ func inProgressExtensionsAreIgnored(name: String) {
     #expect(result == .gaveUp)
 }
 
-@Test func aCancelledSettleReturnsPromptlyInsteadOfSpinning() async throws {
+/// Set once, readable from another thread.
+private final class Latch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = true
+    func lower() { lock.lock(); value = false; lock.unlock() }
+    var isRaised: Bool { lock.lock(); defer { lock.unlock() }; return value }
+}
+
+@Test(.timeLimit(.minutes(1)))
+func aFileAnotherAppIsOnlyReadingIsReady() async throws {
+    let temp = try TempDirectory()
+    let url = try temp.writeFile("shared.pdf", contents: "done")
+
+    // Another app holds a *reading* claim on the file — Preview has the PDF
+    // open, say. Reading claims do not conflict with each other, so this must
+    // settle without waiting. Asking the question with a *writing* intent
+    // instead would both block on this claim and, worse, take a write claim of
+    // Ledge's own on a file it has merely been asked to look at, locking out
+    // every other reader of the user's document to answer "is it finished?".
+    //
+    // The assertion is an ordering fact, not a stopwatch reading: did the
+    // settle finish while the claim was still held? Elapsed-time thresholds
+    // are not trustworthy here — a coordinated read on a loaded machine has
+    // been measured taking most of a second with nothing contending at all.
+    let claimHeld = Latch()
+    let release = DispatchSemaphore(value: 0)
+    nonisolated(unsafe) let readerCoordinator = NSFileCoordinator()
+
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        let readerThread = Thread {
+            var error: NSError?
+            readerCoordinator.coordinate(readingItemAt: url, options: [], error: &error) { _ in
+                continuation.resume()
+                // Held until the settle is done — or, if a mutant is waiting on
+                // this claim rather than ignoring it, until this backstop fires
+                // so the suite fails rather than hangs.
+                _ = release.wait(timeout: .now() + 5.0)
+                claimHeld.lower()
+            }
+        }
+        readerThread.start()
+    }
+    defer { release.signal() }
+
+    let settler = DownloadSettler(sampleInterval: .milliseconds(20), ceiling: .seconds(30))
+    let result = await settler.settle(url)
+
+    #expect(result == .ready)
+    #expect(claimHeld.isRaised,
+            "the check must not wait out a reader's claim; a writing intent would have to")
+}
+
+// A settle that never resumes its continuation does not fail this test, it
+// hangs it — and a hung suite is worse than a failing one, because it reports
+// nothing at all. The limit is the coarsest Swift Testing allows.
+@Test(.timeLimit(.minutes(1)))
+func aCancelledSettleReturnsPromptlyInsteadOfSpinning() async throws {
     let temp = try TempDirectory()
     let url = try temp.writeFile("cancel-me.bin", contents: "0")
 
@@ -182,7 +238,8 @@ func inProgressExtensionsAreIgnored(name: String) {
     #expect(counter.callCount < 100, "a cancelled settle should not keep sampling after cancellation")
 }
 
-@Test func aContendedFileIsReportedStillWritingNotReady() async throws {
+@Test(.timeLimit(.minutes(1)))
+func aContendedFileIsReportedStillWritingNotReady() async throws {
     let temp = try TempDirectory()
     let url = try temp.writeFile("contended.bin", contents: "done")
 

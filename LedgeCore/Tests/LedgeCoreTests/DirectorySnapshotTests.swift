@@ -37,6 +37,40 @@ import Foundation
     #expect(names == ["visible.png"])
 }
 
+/// The seam the rest of this file leaves open: the diff tests above use
+/// hand-built fixtures and the scan tests compare only `lastPathComponent`, so
+/// nothing else ever diffs two *real* scans — which is the single thing this
+/// type exists to do. Whole URLs, deliberately, not names.
+@Test func newEntriesFromTwoRealScansOfTheSameFolder() throws {
+    let temp = try TempDirectory()
+    try temp.writeFile("already-here.png")
+
+    let before = DirectorySnapshot(scanning: temp.url)
+    let added = try temp.writeFile("new.png")
+    let after = DirectorySnapshot(scanning: temp.url)
+
+    #expect(after.newEntries(comparedTo: before) == [added.resolvingSymlinksInPath()])
+    #expect(before.newEntries(comparedTo: after).isEmpty)
+}
+
+/// `entries` is a `Set<URL>` and `URL` equality is path-string equality, so an
+/// entry has to come back spelled the same way a caller would spell it. It does
+/// not by default: handed a folder under `/var/…`, `contentsOfDirectory` returns
+/// its contents under `/private/var/…` — the same files, a different key in
+/// every set they are put into.
+@Test func scanEntriesMatchURLsBuiltFromTheFolderThatWasScanned() throws {
+    let temp = try TempDirectory()
+    try temp.writeFile("top.png")
+    try temp.writeFile("second.png")
+
+    let entries = DirectorySnapshot(scanning: temp.url).entries
+    let expected = Set(["top.png", "second.png"].map {
+        temp.url.appendingPathComponent($0).resolvingSymlinksInPath()
+    })
+
+    #expect(entries == expected, "a scan must be comparable to URLs constructed elsewhere")
+}
+
 @Test func scanningAMissingFolderYieldsNothing() {
     let snapshot = DirectorySnapshot(scanning: URL(fileURLWithPath: "/tmp/does-not-exist-\(UUID())"))
     #expect(snapshot.entries.isEmpty)

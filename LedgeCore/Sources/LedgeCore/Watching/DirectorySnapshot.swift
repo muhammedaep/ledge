@@ -10,6 +10,18 @@ public struct DirectorySnapshot: Equatable, Sendable {
         self.entries = entries
     }
 
+    /// `.skipsSubdirectoryDescendants` is documentation of intent, not a
+    /// behavioural request: `contentsOfDirectory` is shallow either way (the
+    /// option only means anything to `enumerator(at:)`), so removing it changes
+    /// nothing and no test can guard it. It stays as a signpost for anyone
+    /// tempted to swap in an enumerator, which `scanningReadsTopLevelEntriesOnly`
+    /// would then catch.
+    ///
+    /// `.resolvingSymlinksInPath()` is the opposite — load-bearing. `entries` is
+    /// a `Set<URL>` and `URL` equality is path-string equality, so a snapshot is
+    /// only diffable against one taken elsewhere if both sides normalize;
+    /// `/var/…` and `/private/var/…` are otherwise two different keys for one
+    /// file. `newEntriesFromTwoRealScansOfTheSameFolder` guards it.
     public init(scanning folder: URL) {
         let contents = (try? FileManager.default.contentsOfDirectory(
             at: folder,

@@ -4,8 +4,16 @@ import Foundation
 
 private let root = URL(fileURLWithPath: "/tmp/root", isDirectory: true)
 
-private func facts(_ name: String, isDirectory: Bool = false, date: Date = .distantPast) -> FileFacts {
-    FileFacts(url: root.appendingPathComponent(name), isDirectory: isDirectory, creationDate: date)
+private func facts(
+    _ name: String,
+    isDirectory: Bool = false,
+    isPackage: Bool = false,
+    date: Date = .distantPast
+) -> FileFacts {
+    FileFacts(url: root.appendingPathComponent(name),
+              isDirectory: isDirectory,
+              isPackage: isPackage,
+              creationDate: date)
 }
 
 @Test func matchesByExtension() {
@@ -21,11 +29,25 @@ private func facts(_ name: String, isDirectory: Bool = false, date: Date = .dist
 }
 
 @Test func firstMatchingCategoryWins() {
+    // The head of the list must *not* claim the extension, or "first matching"
+    // and "first, period" give the same answer and the test cannot tell the
+    // ordering guarantee from a bug that ignores it entirely.
     let rules = RuleSet(categories: [
-        Category(name: "Design", extensions: ["png"]),
-        Category(name: "Images", extensions: ["png"])
+        Category(name: "Design", extensions: ["psd"]),   // skipped: claims nothing here
+        Category(name: "Images", extensions: ["png"]),   // the first genuine match
+        Category(name: "Screenshots", extensions: ["png"])
     ])
-    #expect(Categorizer.destination(for: facts("a.png"), in: root, using: rules).category == "Design")
+    #expect(Categorizer.destination(for: facts("a.png"), in: root, using: rules).category == "Images")
+}
+
+@Test func customFallbackNameIsHonoured() {
+    // `fallbackName` is user-editable and round-trips through RulesStore, so
+    // the fallback must read it rather than hardcoding "Other".
+    let rules = RuleSet(categories: [Category(name: "Videos", extensions: ["mp4"])],
+                        fallbackName: "Misc")
+    let result = Categorizer.destination(for: facts("mystery.xyz"), in: root, using: rules)
+    #expect(result.category == "Misc")
+    #expect(result.folder == root.appendingPathComponent("Misc"))
 }
 
 @Test func unknownExtensionFallsBack() {
@@ -49,8 +71,30 @@ private func facts(_ name: String, isDirectory: Bool = false, date: Date = .dist
 @Test func directoryMatchesWhenARuleClaimsItsExtension() {
     // .app bundles are directories but must land in Apps.
     let rules = RuleSet(categories: [Category(name: "Apps", extensions: ["app"])])
-    let result = Categorizer.destination(for: facts("Ice.app", isDirectory: true), in: root, using: rules)
+    let result = Categorizer.destination(
+        for: facts("Ice.app", isDirectory: true, isPackage: true), in: root, using: rules)
     #expect(result.category == "Apps")
+}
+
+/// Which bundle types match is macOS's question to answer, not a list this app
+/// keeps: none of these extensions were on the allowlist this replaced, and a
+/// user who adds one to a category expects their documents filed, not shelved
+/// in the fallback.
+@Test(arguments: ["sketch", "rtfd", "photoslibrary", "logicx"])
+func anyPackageDirectoryMatchesWhenARuleClaimsItsExtension(ext: String) {
+    let rules = RuleSet(categories: [Category(name: "Design", extensions: [ext])])
+    let result = Categorizer.destination(
+        for: facts("Thing.\(ext)", isDirectory: true, isPackage: true), in: root, using: rules)
+    #expect(result.category == "Design")
+}
+
+/// The converse, and the reason the guard is not simply "a rule claims it":
+/// a browsable directory stays browsable however familiar its extension looks.
+@Test func aDirectoryTheSystemDoesNotCallAPackageNeverMatches() {
+    let rules = RuleSet(categories: [Category(name: "Apps", extensions: ["app"])])
+    let result = Categorizer.destination(
+        for: facts("not-really.app", isDirectory: true, isPackage: false), in: root, using: rules)
+    #expect(result.category == "Other")
 }
 
 @Test func byExtensionSubdivisionAddsAnUppercasedSubfolder() {

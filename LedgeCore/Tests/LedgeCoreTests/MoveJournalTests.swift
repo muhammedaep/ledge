@@ -27,8 +27,30 @@ private func record(_ name: String, batchID: UUID? = nil, date: Date = Date()) -
 
 @Test func journalSurvivesReload() throws {
     let temp = try TempDirectory()
-    try MoveJournal(directory: temp.url).append(record("a.png"))
-    #expect(MoveJournal(directory: temp.url).records.count == 1)
+    // Whole-record equality, not a count: `batchID` in particular is what
+    // "quit the app, reopen it, undo the batch you just ran" depends on, and
+    // nothing else in the suite watches it cross a restart.
+    // A whole-second date: the journal encodes dates as ISO8601, which has
+    // second resolution, so a `Date()` would not survive verbatim.
+    let original = record("a.png", batchID: UUID(), date: Date(timeIntervalSince1970: 1_756_600_000))
+    try MoveJournal(directory: temp.url).append(original)
+    #expect(MoveJournal(directory: temp.url).records == [original])
+}
+
+@Test func anOutOfOrderJournalFileIsSortedOnLoad() throws {
+    let temp = try TempDirectory()
+    let older = record("old.png", date: Date(timeIntervalSince1970: 100))
+    let newer = record("new.png", date: Date(timeIntervalSince1970: 200))
+
+    // Written directly rather than through append(), because append() always
+    // persists an already-sorted array — the load-path sort only ever matters
+    // for a file this version did not write: a hand edit, or an older build.
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    try encoder.encode([older, newer])
+        .write(to: temp.url.appendingPathComponent("journal.json"))
+
+    #expect(MoveJournal(directory: temp.url).records.map(\.originalName) == ["new.png", "old.png"])
 }
 
 @Test func oldestRecordsAreTrimmedAtTheCap() throws {
