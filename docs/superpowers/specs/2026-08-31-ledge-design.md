@@ -84,8 +84,12 @@ Clicking the menu bar icon opens a window-style popover:
 - `↩` undoes that single move, returning the file to where it was found.
 - Clicking a row reveals it in Finder.
 - Rows persist across launches and are capped at a user-set count (default 10).
-- A row whose file no longer exists at the recorded path is shown dimmed and is not
-  draggable, with a "Locate…" affordance that opens Finder at the parent folder.
+- A row whose file no longer exists at the recorded path is shown dimmed, is not
+  draggable, and has its undo disabled; tapping it does nothing.
+  *Amended during implementation (plan amendment A10): this originally offered a
+  "Locate…" affordance opening Finder at the parent folder. That is precisely the
+  folder the file is no longer in, so the button would have sent the user
+  somewhere useless. It was cut rather than built.*
 
 ### 5.3 Organize Now
 
