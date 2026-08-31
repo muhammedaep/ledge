@@ -11,11 +11,9 @@ public final class ProjectStore {
         self.directory = directory
     }
 
+    /// The app's real location. See `LedgeSupportDirectory`.
     public static func applicationSupport() -> ProjectStore {
-        let base = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Ledge", isDirectory: true)
-        return ProjectStore(directory: base)
+        ProjectStore(directory: LedgeSupportDirectory.url)
     }
 
     private var fileURL: URL { directory.appendingPathComponent(fileName) }

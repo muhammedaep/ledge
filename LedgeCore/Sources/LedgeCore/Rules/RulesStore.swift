@@ -12,12 +12,9 @@ public final class RulesStore {
         self.directory = directory
     }
 
-    /// The app's real location: ~/Library/Application Support/Ledge
+    /// The app's real location. See `LedgeSupportDirectory`.
     public static func applicationSupport() -> RulesStore {
-        let base = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Ledge", isDirectory: true)
-        return RulesStore(directory: base)
+        RulesStore(directory: LedgeSupportDirectory.url)
     }
 
     private var fileURL: URL { directory.appendingPathComponent(fileName) }

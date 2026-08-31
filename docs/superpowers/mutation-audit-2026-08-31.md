@@ -14,7 +14,7 @@ It has three parts:
   each new test demonstrated *red* against the mutation it targets before being
   accepted.
 - **Part 3** is `ProjectStore`, which the brief named but the original audit did
-  not reach: 4 mutations, 3 killed, 1 survived.
+  not reach: 4 mutations, 3 killed on the day, 1 survivor since closed.
 
 **Method.** `git worktree add --detach 98566aa /tmp/ledge-11b-mut`; all mutation
 work in that checkout, never in the repository. One mutation applied at a time
@@ -604,42 +604,75 @@ against the suite rather than transcribed from anyone else's result.
 | P1 | `load()` returns the list reversed (drop order preservation) | KILLED | `orderIsPreservedAcrossReload`, `savedProjectsAreLoadedBack` |
 | P2 | `load()` returns `[]` on a valid file | KILLED | `orderIsPreservedAcrossReload`, `savedProjectsAreLoadedBack` |
 | P3 | `save()` drops `createDirectory` | KILLED | `projectStoreSaveCreatesTheDirectoryIfMissing` (sole) |
-| P4 | `applicationSupport()` points at the wrong folder | **SURVIVED** | — |
+| P4 | `applicationSupport()` points at the wrong folder | **SURVIVED — since closed** | `supportDirectoryIsLedgesOwnFolderInsideApplicationSupport` |
 
-**Totals: 4 mutations, 3 killed, 1 survived.**
+**Totals: 4 mutations, 3 killed on the day, 1 survivor since closed.**
 
 The brief's two both die, and to two tests each rather than one — `Project` is
 `Equatable`, so `savedProjectsAreLoadedBack` compares whole values rather than a
-count, which is what lets it catch a reordering as well as a wipe. That is the
-same property that was missing from `journalSurvivesReload` before this audit.
+count, which is what lets it catch a reordering as well as a wipe.
+
+**Worth knowing before building the next store: making the persisted value
+`Equatable` buys coverage for free.** One round-trip assertion then pins every
+field, in order, without anyone having to think of them one at a time. Its
+absence is exactly what weakened `journalSurvivesReload`, which asserted
+`records.count == 1` and so could not see a dropped `batchID`, a mangled date or
+a wrong destination. A single `==` closed that, and it is the reason P1 and P2
+here were never going to survive.
 
 P3 was chosen as the `ProjectStore` counterpart of R3, and behaves the same way:
 one test, sole killer.
 
-### Survivor P4 — `applicationSupport()` is unverified in all three stores
+### Survivor P4 — one derivation written three times
 
-Changing the folder that `ProjectStore.applicationSupport()` points at kills
-nothing. Nothing constructs that factory in a test, because nothing can: it
-resolves `~/Library/Application Support/Ledge`, and exercising it would write
-into the user's real home directory. Every test in this suite goes through
-`TempDirectory` precisely so that never happens.
-
-This is **not specific to `ProjectStore`.** `RulesStore.applicationSupport()`
-and `MoveJournal.applicationSupport()` build the same path in the same way and
-are equally unverified. The consequence of a drift is not loud: one store
-disagreeing with the others about the folder name means the app comes up with
-an empty list, having silently left the user's real data where it was.
-
-**Left open deliberately, and it is closable.** A test would not have to touch
-the filesystem at all — the useful assertion is that the three factories agree
-with each other, which is a pure comparison of derived URLs. It needs
-`directory` widened from `private` to `internal` in the three stores. That is a
-production visibility change in three files at the tail of an approved task, so
-it is recorded here as a decision rather than taken unilaterally.
-
-Recorded, not closed:
+Changing the folder `ProjectStore.applicationSupport()` points at killed
+nothing:
 
 ```
 Mutation: applicationSupport() .appendingPathComponent("Ledge") -> "Ledge-typo"
 ✔ Test run with 111 tests passed        <- nothing notices
 ```
+
+Nothing constructed that factory in a test, because nothing could: it resolves
+`~/Library/Application Support/Ledge`, and exercising it would write into the
+user's real home directory, which is exactly what `TempDirectory` exists to
+prevent. And it was **not specific to `ProjectStore`** —
+`RulesStore.applicationSupport()` and `MoveJournal.applicationSupport()` built
+the same path the same way and were equally unverified. A drift is quiet: the
+store that drifted comes up empty on the next launch, with no crash and no
+error, while the user's real data sits untouched where it was left.
+
+**Resolution: extract, rather than widen.** The first proposal was to widen
+`directory` from `private` to `internal` in the three stores so a test could
+assert the three factories agree. The ruling was to fix the cause instead — the
+derivation was written out three times, which is *why* it could drift. It now
+lives once, in `LedgeSupportDirectory`, and all three factories call it. Less
+code, no new visibility, and nothing left to disagree about. **No public API
+changed:** all three factories keep their signatures.
+
+The test asserts four things about that one derivation and creates nothing, so
+no test touches the real `~/Library`. Each expectation is derived independently
+rather than by calling the helper and comparing it with itself — `"Ledge"` and
+`"Application Support"` are literals, and `NSHomeDirectory()` is a different API
+from the `FileManager.urls(for:in:)` the code uses. A test that computes the
+answer the same way the code does proves nothing, which is the failure mode this
+whole audit has been hunting.
+
+Four ways it can realistically drift, each killed by a *different* one of the
+four assertions — so none of them is redundant:
+
+```
+S1 folder name case drift ("Ledge" -> "ledge")           KILLED
+     (url.lastPathComponent → "ledge") == "Ledge"
+S2 .applicationSupportDirectory -> .documentDirectory    KILLED
+     (["/","Users","…","Documents","Ledge"]).contains("Application Support")
+S3 .userDomainMask -> .systemDomainMask                  KILLED
+     ("/Library/Application Support/Ledge").hasPrefix("/Users/…")
+S4 isDirectory: true -> false                            KILLED
+     (file:///…/Application%20Support/Ledge).hasDirectoryPath → false
+```
+
+What this still does not catch: someone reintroducing a local derivation inside
+one factory, bypassing the helper. Detecting that needs the visibility widening
+this ruling declined, and the extraction makes it a conspicuous thing to write
+rather than the path of least resistance.

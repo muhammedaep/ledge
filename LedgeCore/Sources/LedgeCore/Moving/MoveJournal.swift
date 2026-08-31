@@ -14,11 +14,9 @@ public final class MoveJournal {
         self.storage = Self.read(from: directory.appendingPathComponent(Self.fileName))
     }
 
+    /// The app's real location. See `LedgeSupportDirectory`.
     public static func applicationSupport(cap: Int = 200) -> MoveJournal {
-        let base = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Ledge", isDirectory: true)
-        return MoveJournal(directory: base, cap: cap)
+        MoveJournal(directory: LedgeSupportDirectory.url, cap: cap)
     }
 
     private static let fileName = "journal.json"
