@@ -31,13 +31,11 @@ struct OrganizeSheet: View {
     @State private var folder: URL?
     @State private var preview = OrganizePreview(plan: [])
     @State private var excluded: Set<String> = []
-    @State private var lastBatch: UUID?
     @State private var isScanning = false
 
-    /// True for the whole of a batch — a move or an undo, both of which write to
-    /// disk. It disables every button that starts more filing, so a second pass
-    /// cannot begin over a folder the first is still moving through.
-    @State private var isMoving = false
+    /// This sheet's own window, so the refresh below can tell its panel becoming
+    /// key from Settings becoming key.
+    @State private var sheetWindow: NSWindow?
 
     /// Bumped to ask for a fresh plan. Driving the scan through `.task(id:)`
     /// rather than calling it directly means SwiftUI cancels an in-flight scan
@@ -49,9 +47,11 @@ struct OrganizeSheet: View {
         folder ?? state.preferences.watchedFolders.first
     }
 
-    private var selectedMoves: [PlannedMove] {
-        preview.selectedMoves(excluding: excluded)
-    }
+    /// Whether a batch is running. Read from `AppState`, not held here: the
+    /// batch outlives this window, so a flag scoped to the view would come back
+    /// `false` on reopen and let a second pass start over a folder the first is
+    /// still moving through.
+    private var isMoving: Bool { state.isOrganizing }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -63,7 +63,11 @@ struct OrganizeSheet: View {
             footer
         }
         .frame(width: 460)
+        .background(WindowReader { sheetWindow = $0 })
         .task(id: rescanToken) { await rescan() }
+        // A stale failure from the watcher an hour ago would otherwise be read
+        // as this batch's, since `lastError` holds until something clears it.
+        .onAppear { state.clearError() }
         // The plan has to be re-read when this sheet is shown again, and
         // `.onAppear`/`.task` are not enough on their own. Measured on macOS
         // 26.6: dismissing the menu bar panel while this sheet is up hides both
@@ -73,8 +77,16 @@ struct OrganizeSheet: View {
         // while the watcher kept filing underneath it. `didBecomeKey` does fire
         // on that reopen, which makes it the trigger that actually works. It is
         // the same technique, for the same reason, as `ShelfView`'s row refresh.
+        //
+        // Filtered to this sheet and the panel it hangs off, because the
+        // notification is global: unfiltered, opening Settings or clicking back
+        // into any other window of the app kicks off a full rescan of the
+        // watched folder, which is the 132 ms read described on `rescan`.
         .onReceive(NotificationCenter.default.publisher(
-            for: NSWindow.didBecomeKeyNotification)) { _ in
+            for: NSWindow.didBecomeKeyNotification)) { note in
+            guard let becameKey = note.object as? NSWindow,
+                  becameKey === sheetWindow || becameKey === sheetWindow?.sheetParent
+            else { return }
             rescanToken += 1
         }
     }
@@ -143,18 +155,47 @@ struct OrganizeSheet: View {
 
     private var footer: some View {
         HStack {
-            if let batch = lastBatch {
-                Button("Undo Last Batch") { undo(batch) }
+            // Offered only when the batch actually moved something.
+            // `UndoService.undoBatch` finds no records for a batch where every
+            // move failed and returns quietly, so the button would report
+            // success having put nothing back.
+            if let outcome = state.lastOrganizeOutcome, outcome.isUndoable {
+                Button("Undo Last Batch") { undo(outcome.id) }
                     .disabled(isMoving)
             }
+            outcomeSummary
             Spacer()
-            Button("Cancel") { dismiss() }
+            // Never disabled, and it does not stop the batch — it closes the
+            // preview. The label says so while one is running: a button reading
+            // "Cancel" next to "Moving…" promises an abort this does not
+            // perform. Trapping the user in the sheet for a batch that may be
+            // copying gigabytes across volumes would be worse, and it is a
+            // promise the app cannot keep anyway — clicking the menu bar icon
+            // hides the panel regardless. Nothing is lost by leaving: the batch
+            // and its undo handle live on `AppState` now, and are still here
+            // when the sheet is reopened.
+            Button(isMoving ? "Close" : "Cancel") { dismiss() }
                 .keyboardShortcut(.cancelAction)
             Button(action: startMove) { Text(moveButtonTitle) }
                 .keyboardShortcut(.defaultAction)
-                .disabled(isMoving || selectedMoves.isEmpty)
+                .disabled(isMoving || preview.selectedCount(excluding: excluded) == 0)
         }
         .padding(12)
+    }
+
+    /// What the last batch actually did. The button promised a number before it
+    /// ran; this is the number that landed, and they are allowed to differ — a
+    /// source can be filed away by the watcher or deleted between the two.
+    @ViewBuilder
+    private var outcomeSummary: some View {
+        if let outcome = state.lastOrganizeOutcome, !isMoving {
+            Text(outcome.isPartial
+                 ? "Moved \(outcome.moved) of \(outcome.attempted)."
+                 : "Moved \(outcome.moved).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 4)
+        }
     }
 
     /// A failed move would otherwise be invisible here: `AppState` records it in
@@ -193,7 +234,7 @@ struct OrganizeSheet: View {
     }
 
     private var moveButtonTitle: LocalizedStringKey {
-        isMoving ? "Moving…" : "Move \(selectedMoves.count)"
+        isMoving ? "Moving…" : "Move \(preview.selectedCount(excluding: excluded))"
     }
 
     // MARK: - Actions
@@ -214,23 +255,21 @@ struct OrganizeSheet: View {
     /// `moves` is captured before the batch starts, so what runs is the list the
     /// user was looking at when they agreed to it — not whatever a rescan
     /// landing mid-batch might have replaced it with.
+    ///
+    /// The flag and the resulting batch both live on `AppState`, so this task
+    /// finishes correctly even if the sheet is dismissed while it runs.
     private func startMove() {
         guard let root = targetFolder else { return }
-        let moves = selectedMoves
-        isMoving = true
+        let moves = preview.selectedMoves(excluding: excluded)
         Task {
-            lastBatch = await state.apply(moves, root: root)
-            isMoving = false
+            await state.apply(moves, root: root)
             rescanToken += 1
         }
     }
 
     private func undo(_ batch: UUID) {
-        isMoving = true
         Task {
             await state.undoBatch(batch)
-            lastBatch = nil
-            isMoving = false
             rescanToken += 1
         }
     }
@@ -263,5 +302,35 @@ struct OrganizeSheet: View {
         // A newer scan was requested while this one ran; its result wins.
         guard !Task.isCancelled else { return }
         preview = OrganizePreview(plan: plan)
+    }
+}
+
+/// Hands back the `NSWindow` a SwiftUI view ends up in.
+///
+/// `NSWindow.didBecomeKeyNotification` carries no way to ask "is this mine", and
+/// the sheet needs to tell its own panel coming back from being hidden apart
+/// from Settings being brought forward. Reporting from `viewDidMoveToWindow`
+/// rather than reading `view.window` after a hop keeps the whole thing on the
+/// main actor, with no non-`Sendable` view captured across a boundary.
+private struct WindowReader: NSViewRepresentable {
+    let onWindow: (NSWindow?) -> Void
+
+    final class Reporter: NSView {
+        var onWindow: ((NSWindow?) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            onWindow?(window)
+        }
+    }
+
+    func makeNSView(context: Context) -> Reporter {
+        let view = Reporter()
+        view.onWindow = onWindow
+        return view
+    }
+
+    func updateNSView(_ nsView: Reporter, context: Context) {
+        nsView.onWindow = onWindow
     }
 }

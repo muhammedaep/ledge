@@ -48,6 +48,21 @@ final class AppState {
     private(set) var recentRecords: [MoveRecord] = []
     private(set) var lastError: String?
 
+    /// True while an Organize Now batch is being applied or undone.
+    ///
+    /// Here rather than in the sheet because what it guards is a filesystem
+    /// operation, not a view. As `@State` it was destroyed with the sheet: the
+    /// user could dismiss mid-batch — Cancel never disabled — and reopen onto a
+    /// fresh `false`, starting a second pass over a folder the first was still
+    /// moving through. The batch outlives the window that started it, so the
+    /// flag has to as well.
+    private(set) var isOrganizing = false
+
+    /// The most recent Organize Now batch and how it went, kept for the same
+    /// reason: dismissing the sheet mid-batch used to lose the only handle on a
+    /// batch that was still running, and with it the ability to undo it.
+    private(set) var lastOrganizeOutcome: BatchOutcome?
+
     private let rulesStore = RulesStore.applicationSupport()
     private let projectStore = ProjectStore.applicationSupport()
     private let filing = FilingJournal()
@@ -248,10 +263,20 @@ final class AppState {
 
     // MARK: - Filing
 
-    /// Files a batch of already-planned moves (Organize Now). Returns the batch id.
-    @discardableResult
-    func apply(_ plan: [PlannedMove], root: URL) async -> UUID {
+    /// Files a batch of already-planned moves (Organize Now).
+    ///
+    /// Re-entry is refused rather than queued. Two passes over one folder at
+    /// once are not destructive — `FileMover` serializes and never overwrites,
+    /// so nothing is lost or duplicated — but the second pass plans sources the
+    /// first has already moved, and every one of them comes back as "Couldn't
+    /// move …" for a file that is sitting safely where the user asked for it.
+    func apply(_ plan: [PlannedMove], root: URL) async {
+        guard !isOrganizing else { return }
+        isOrganizing = true
+        defer { isOrganizing = false }
+
         let batch = UUID()
+        var moved = 0
         for planned in plan {
             do {
                 let final = try await moveOffMainActor(planned.source, into: planned.destination.folder)
@@ -261,12 +286,13 @@ final class AppState {
                     to: final,
                     batchID: batch
                 ))
+                moved += 1
             } catch {
                 lastError = String(localized: "Couldn't move \(planned.source.lastPathComponent).")
             }
         }
+        lastOrganizeOutcome = BatchOutcome(id: batch, moved: moved, attempted: plan.count)
         await refreshRecords()
-        return batch
     }
 
     private func handle(_ urls: Set<URL>) async {
@@ -316,9 +342,18 @@ final class AppState {
         }
     }
 
+    /// Puts a whole Organize Now batch back. Takes the same guard as `apply`:
+    /// undo moves files too, and a pass starting while one is running would
+    /// plan against a folder in the middle of being emptied.
     func undoBatch(_ batchID: UUID) async {
+        guard !isOrganizing else { return }
+        isOrganizing = true
+        defer { isOrganizing = false }
+
         do {
             try await filing.undoBatch(batchID)
+            // The batch is gone; there is nothing left to offer an undo for.
+            if lastOrganizeOutcome?.id == batchID { lastOrganizeOutcome = nil }
             await refreshRecords()
         } catch {
             lastError = String(localized: "Couldn't undo that batch.")

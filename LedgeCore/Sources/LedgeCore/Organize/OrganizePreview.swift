@@ -32,18 +32,20 @@ public struct OrganizePreview: Equatable, Sendable {
 
     public let plan: [PlannedMove]
 
-    public init(plan: [PlannedMove]) {
-        self.plan = plan
-    }
-
     /// The rows to show, largest first.
     ///
     /// Ties break on the category name. `sorted(by:)` is not guaranteed stable,
     /// so ordering on the count alone lets two equal-sized categories swap
     /// places between one rescan and the next — a list reshuffling under the
     /// user while they are deciding what to move.
-    public var groups: [Group] {
-        Dictionary(grouping: plan, by: \.destination.category)
+    ///
+    /// Grouped once, in `init`, rather than on every access: this is read from a
+    /// SwiftUI `body`, which runs far more often than the plan changes.
+    public let groups: [Group]
+
+    public init(plan: [PlannedMove]) {
+        self.plan = plan
+        self.groups = Dictionary(grouping: plan, by: \.destination.category)
             .map { Group(category: $0.key, count: $0.value.count) }
             .sorted { $0.count == $1.count ? $0.category < $1.category : $0.count > $1.count }
     }
@@ -53,13 +55,19 @@ public struct OrganizePreview: Equatable, Sendable {
     /// The moves a confirmation acts on, given the categories switched off.
     ///
     /// The counterpart of `groups`: every move counted in a group that is not
-    /// excluded appears here, and nothing else does.
+    /// excluded appears here, and nothing else does. Called when the user
+    /// commits, not from `body` — `selectedCount` answers the button's question
+    /// without building the array.
     public func selectedMoves(excluding excluded: Set<String>) -> [PlannedMove] {
         plan.filter { !excluded.contains($0.destination.category) }
     }
 
     /// How many items the confirmation button promises to move.
+    ///
+    /// Counts without allocating, because `body` asks on every pass.
     public func selectedCount(excluding excluded: Set<String>) -> Int {
-        selectedMoves(excluding: excluded).count
+        plan.reduce(into: 0) { total, move in
+            if !excluded.contains(move.destination.category) { total += 1 }
+        }
     }
 }
