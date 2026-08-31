@@ -1,0 +1,41 @@
+import Foundation
+
+public enum UndoError: Error, Equatable {
+    case fileNoLongerAtRecordedPath(URL)
+}
+
+/// Reverses recorded moves. Undo goes through FileMover like every other move,
+/// so it inherits the never-overwrite guarantee: if something new has taken the
+/// original name, the restored file is numbered instead of clobbering it.
+public struct UndoService {
+    private let mover: FileMover
+    private let journal: MoveJournal
+
+    public init(mover: FileMover, journal: MoveJournal) {
+        self.mover = mover
+        self.journal = journal
+    }
+
+    @discardableResult
+    public func undo(_ record: MoveRecord) throws -> URL {
+        guard FileManager.default.fileExists(atPath: record.to.path) else {
+            throw UndoError.fileNoLongerAtRecordedPath(record.to)
+        }
+        let restored = try mover.move(record.to, into: record.from)
+        try journal.remove(id: record.id)
+        return restored
+    }
+
+    /// Undoes an Organize Now batch as one action. Records whose file has since
+    /// gone missing are skipped rather than aborting the whole batch.
+    @discardableResult
+    public func undoBatch(_ batchID: UUID) throws -> [URL] {
+        var restored: [URL] = []
+        for record in journal.records(inBatch: batchID) {
+            guard FileManager.default.fileExists(atPath: record.to.path) else { continue }
+            restored.append(try mover.move(record.to, into: record.from))
+        }
+        try journal.remove(batchID: batchID)
+        return restored
+    }
+}
