@@ -42,11 +42,6 @@ public final class MoveJournal {
         try persist()
     }
 
-    public func remove(batchID: UUID) throws {
-        storage.removeAll { $0.batchID == batchID }
-        try persist()
-    }
-
     private func persist() throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let encoder = JSONEncoder()

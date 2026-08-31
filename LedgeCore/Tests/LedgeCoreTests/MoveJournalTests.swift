@@ -55,7 +55,7 @@ private func record(_ name: String, batchID: UUID? = nil, date: Date = Date()) -
     #expect(journal.records.map(\.originalName) == ["b.png"])
 }
 
-@Test func batchRecordsAreGroupedAndRemovedTogether() throws {
+@Test func recordsInBatchReturnsExactlyThatBatch() throws {
     let temp = try TempDirectory()
     let journal = MoveJournal(directory: temp.url)
     let batch = UUID()
@@ -64,10 +64,10 @@ private func record(_ name: String, batchID: UUID? = nil, date: Date = Date()) -
     try journal.append(record("b.png", batchID: batch))
     try journal.append(record("solo.png"))
 
-    #expect(journal.records(inBatch: batch).count == 2)
-
-    try journal.remove(batchID: batch)
-    #expect(journal.records.map(\.originalName) == ["solo.png"])
+    let inBatch = journal.records(inBatch: batch)
+    #expect(inBatch.count == 2)
+    #expect(Set(inBatch.map(\.originalName)) == ["a.png", "b.png"])
+    #expect(!inBatch.contains { $0.originalName == "solo.png" })
 }
 
 @Test func removingByIdPersistsAcrossReload() throws {
@@ -81,21 +81,6 @@ private func record(_ name: String, batchID: UUID? = nil, date: Date = Date()) -
 
     // A fresh instance over the same directory must not see the removed record.
     #expect(MoveJournal(directory: temp.url).records.map(\.originalName) == ["b.png"])
-}
-
-@Test func removingByBatchIdPersistsAcrossReload() throws {
-    let temp = try TempDirectory()
-    let journal = MoveJournal(directory: temp.url)
-    let batch = UUID()
-
-    try journal.append(record("a.png", batchID: batch))
-    try journal.append(record("b.png", batchID: batch))
-    try journal.append(record("solo.png"))
-
-    try journal.remove(batchID: batch)
-
-    // A fresh instance over the same directory must not see the removed batch.
-    #expect(MoveJournal(directory: temp.url).records.map(\.originalName) == ["solo.png"])
 }
 
 @Test func corruptJournalFileLoadsAsEmpty() throws {
