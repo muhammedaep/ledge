@@ -501,29 +501,73 @@ Mutation: drop `.sorted { $0.source.lastPathComponent < $1.source.lastPathCompon
 - **`FolderWatcher` and its tests** were out of scope for this task and were not
   touched.
 
-## One pre-existing test is failing, and it is not from this work
+## The wall-clock assertions in `DownloadSettlerTests`
 
-`DownloadSettlerTests.aStableFileIsReady` (from Task 9) asserts
-`elapsed < 80ms` around a 50ms sample — 30ms of slack. It now fails
-consistently in the shared tree, at 0.72–0.90s.
+`aStableFileIsReady` (from Task 9) asserted `elapsed < 80ms` around a 50ms
+sample. This audit first attributed its failure to the concurrent
+`FolderWatcher` work, on the evidence that it ran 5/5 green with those files
+pristine. **That reading was too generous, and is corrected here:** the
+assertion fails in isolation too, at 80.9ms. Its margin was ~1.4x — measured
+across ten runs it sat at 51–56ms against an 80ms bound — and the added load
+merely collected on a debt that was always there.
 
-Bisected rather than assumed:
+All four elapsed assertions in the file were then measured, by replacing each
+bound with an impossible one so the real value was printed, and each was mutated
+to find out what it actually catches.
 
-| Tree | Result |
-| --- | --- |
-| This task's changes, `FolderWatcher` pristine at `98566aa` | **107 tests, 5/5 runs green**, suite 0.85s |
-| The same, plus the in-flight `FolderWatcher` work from the shared tree | `aStableFileIsReady` **fails 3/3**, suite 3.2s |
+| Test | Bound | Actual | Headroom | What the bound catches |
+| --- | --- | --- | --- | --- |
+| `aStableFileIsReady` | `< 80ms` | 51.5–56.2ms | **1.42x** | the sentinel seed — **rebuilt, below** |
+| `aGrowingFileIsNotReadyUntilItStops` | `>= 100ms` | 269–299ms | 2.7–3.0x | **sole killer** of "conclude ready without waiting for stability" (fires at 28.9ms). Kept |
+| `aVanishedFileIsIgnored` | `< 50ms` | 0.01–0.03ms | ~1700x | **sole killer** of "drop the top-level `fileExists` guard" (fires at 100.9ms; the result stays `.ignored`, so only elapsed notices). Kept |
+| `ignoredExtensionSettlesAsIgnoredWithoutWaiting` | `< 50ms` | ~0.005ms | ~9000x | nothing — the `isIgnored` mutation is killed by the *result* assertion, and at ~10ms the mutant slips under this bound without firing. Decoration, but harmless. Kept |
 
-The new watcher tests roughly quadruple the suite's runtime, and that test's
-budget cannot absorb the load. The fix belongs with whoever owns that round —
-either widen the budget or, better, rebuild the assertion on something other
-than a stopwatch, the way `aFileAnotherAppIsOnlyReadingIsReady` above was. Left
-untouched here deliberately: `FolderWatcher` is another agent's scope.
+**A floor is safer than a ceiling under load, measured rather than assumed.**
+The growth test's value moved *up* under load — 239–271ms in isolation,
+269–299ms in the full suite — away from its floor. Load inflates elapsed time,
+which pushes a value toward a ceiling and away from a floor. The residual risk
+for a floor is the reverse: the racing writer stalling long enough for two
+settler samples to match early. That did not occur in 20 runs, and the floor
+sits 2.7x clear.
 
-A second, intermittent failure was seen once in the same tree,
-`watcherDoesNotReemitFilesAfterFolderReappears`, observing sandbox
-atomic-write temp files (`pre-existing.png.sb-684a1d85-F71cZb`) as if they were
-user files. Also that round's to own; recorded here only because it was seen.
+### `aStableFileIsReady`, rebuilt on the deadline rather than the clock
+
+`settle` tests its deadline only at the top of each iteration, so a ceiling far
+*shorter* than one sample interval is survivable exactly once. That turns
+"settled on the first sample" into a fact about the returned value: a settle
+concluding on its first sample returns `.ready` however slow the machine is,
+while one needing a second finds the deadline long past and reports `.gaveUp`.
+Load cannot turn one into the other.
+
+Counting `sizeProvider` calls — the obvious alternative — **does not work here,
+and was checked rather than assumed**: seeding `previous` with the `-1` sentinel
+costs an extra loop *iteration* but not an extra read, because the read the seed
+would have done simply moves inside the loop. Under the short ceiling the bug is
+cut off mid-loop, so the count does differ and both assertions fire.
+
+```
+Mutation: var previous = sizeProvider(url)  ->  var previous: Int64 = -1
+✘ aStableFileIsReady: (result → .gaveUp) == .ready
+✘ aStableFileIsReady: (reads.callCount → 1) == 2
+   Real code: ✔ passed after 0.215 seconds
+
+count-only variant (generous ceiling, #expect(count == 2)):
+✔ countOnlyProbe passed          <- the bug survives it
+```
+
+### Still open, and not this task's to close
+
+- `droppingTheWatcherWithoutStoppingClosesItsDescriptor` failed once in 20 warm
+  shared-tree runs.
+- `watcherDoesNotReemitFilesAfterFolderReappears` was seen once treating sandbox
+  atomic-write temp files (`pre-existing.png.sb-684a1d85-F71cZb`) as user files.
+- `aContendedFileIsReportedStillWritingNotReady` (Task 9) failed once in ~10
+  full-suite runs with `.cancelled` instead of `.stillWriting`, and **0 times in
+  30 isolated runs**. Load-sensitive rather than broken: it sleeps 60ms before
+  cancelling and assumes the settle has reached the coordinated read by then,
+  but under load the cancel can land while the settler is still sampling, where
+  `Task.isCancelled` correctly returns `.cancelled`. Same family as the above,
+  and the same fix shape — wait on the fact, not on 60ms.
 
 ## Production changes made under this audit
 

@@ -33,26 +33,63 @@ func inProgressExtensionsAreIgnored(name: String) {
     #expect(elapsed < .milliseconds(50), "an ignored extension must return immediately, not wait through any sampling")
 }
 
+/// A `sizeProvider` that records how many times it was asked. How often a
+/// settle samples is then a fact a test can assert directly, instead of
+/// something inferred from how long the settle took.
+private final class SizeReads: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    private let size: Int64
+
+    init(returning size: Int64) { self.size = size }
+
+    func read(_ url: URL) -> Int64 {
+        lock.lock(); defer { lock.unlock() }
+        count += 1
+        return size
+    }
+
+    var callCount: Int { lock.lock(); defer { lock.unlock() }; return count }
+}
+
 @Test func aStableFileIsReady() async throws {
     let temp = try TempDirectory()
     let url = try temp.writeFile("report.pdf", contents: "done")
-    // A 50ms sampleInterval: a correct settle matches on its very first
-    // sample (previous seeded from the real initial read) and returns in
-    // about one interval. If that seed were instead some sentinel unrelated
-    // to the real first read, the first sample would spuriously differ and
-    // settle would only converge on the second sample, roughly twice as
-    // long — the elapsed assertion below is sized to catch exactly that.
-    let settler = DownloadSettler(
-        sampleInterval: .milliseconds(50),
-        ceiling: .seconds(2),
-        sizeProvider: { _ in 4 }
-    )
-    let start = ContinuousClock.now
-    let result = await settler.settle(url)
-    let elapsed = start.duration(to: ContinuousClock.now)
 
-    #expect(result == .ready)
-    #expect(elapsed < .milliseconds(80), "a file that never changes must settle on the first sample, not the second")
+    // "A file that never changes settles on its first sample" is asserted here
+    // as a fact about the outcome, not read off a stopwatch.
+    //
+    // `settle` tests its deadline only at the top of each iteration, so a
+    // ceiling far *shorter* than one sample interval is survivable exactly
+    // once: a settle that concludes on its first sample returns .ready however
+    // slow the machine is, while one that needs a second sample finds the
+    // deadline long past and reports .gaveUp. Load cannot turn one into the
+    // other.
+    //
+    // This replaces an `elapsed < 80ms` assertion whose margin was gone —
+    // measured over ten runs it sat at 51-56ms, and it failed in isolation at
+    // 80.9ms.
+    //
+    // Worth recording why the ceiling, and not merely the read count, is what
+    // carries this test. Seeding `previous` with a sentinel costs an extra
+    // loop *iteration* but not an extra read: the read the seed would have
+    // done simply moves inside the loop, so with a generous ceiling both the
+    // real code and the bug make exactly two reads. Checked by mutation rather
+    // than assumed — a count-only version of this test passes against the
+    // sentinel. Under the short ceiling the bug is cut off mid-loop, so both
+    // assertions below fire, the count now pinning sampling shape rather than
+    // carrying the load alone.
+    let reads = SizeReads(returning: 4)
+    let settler = DownloadSettler(
+        sampleInterval: .milliseconds(200),
+        ceiling: .milliseconds(20),
+        sizeProvider: { reads.read($0) }
+    )
+
+    let result = await settler.settle(url)
+
+    #expect(result == .ready, "a stable file must conclude on its first sample, before the ceiling")
+    #expect(reads.callCount == 2, "one seeding read before the loop, plus the one sample inside it")
 }
 
 @Test func fileSizeReflectsGrowthAsTheFileIsWrittenTo() throws {
