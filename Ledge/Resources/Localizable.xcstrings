@@ -289,6 +289,22 @@
         }
       }
     },
+    "Couldn't save your projects.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save your projects."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Projeleriniz kaydedilemedi."
+          }
+        }
+      }
+    },
     "Couldn't save your rules.": {
       "localizations": {
         "en": {
@@ -1213,6 +1229,22 @@
         }
       }
     },
+    "Some of your rules named a folder Ledge can't use and were removed. The rest are unchanged.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some of your rules named a folder Ledge can't use and were removed. The rest are unchanged."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bazı kurallarınız Ledge'in kullanamayacağı bir klasör adı taşıdığı için kaldırıldı. Geri kalanlar değişmedi."
+          }
+        }
+      }
+    },
     "Stored as %@ — an extension is the last dot-separated piece of a name.": {
       "localizations": {
         "en": {
@@ -1241,6 +1273,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alt klasörler"
+          }
+        }
+      }
+    },
+    "This folder isn't available right now.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This folder isn't available right now."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu klasör şu anda kullanılamıyor."
           }
         }
       }
@@ -1353,6 +1401,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "İzlenen klasörler"
+          }
+        }
+      }
+    },
+    "Your rules file couldn't be read, so Ledge went back to the defaults. The old file was renamed, not deleted.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your rules file couldn't be read, so Ledge went back to the defaults. The old file was renamed, not deleted."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kurallar dosyanız okunamadı, Ledge varsayılanlara döndü. Eski dosya silinmedi, adı değiştirildi."
           }
         }
       }

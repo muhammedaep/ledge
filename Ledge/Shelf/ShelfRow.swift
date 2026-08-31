@@ -43,8 +43,13 @@ struct ShelfRow: View {
     ///
     /// `isPresent` short-circuits it, which also keeps the common stale case
     /// from touching the filesystem on the main actor at all.
+    ///
+    /// `FileEntry.exists` rather than `fileExists` so this agrees with what the
+    /// mover and undo mean by "there": a dangling symlink is an entry the rest
+    /// of the app will happily move, and refusing to drag or reveal it here
+    /// would be the row disagreeing with its own undo button.
     private func isStillThere() -> Bool {
-        isPresent && FileManager.default.fileExists(atPath: record.to.path)
+        isPresent && FileEntry.exists(atPath: record.to.path)
     }
 
     var body: some View {

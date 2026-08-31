@@ -132,6 +132,17 @@ struct OrganizeSheet: View {
     private var content: some View {
         if state.preferences.watchedFolders.isEmpty {
             message("Add a folder to watch in Settings first.")
+        } else if let target = targetFolder, !state.isUsable(target) {
+            // The gate that used to sit on the shelf's Organize Now button,
+            // where it was asked about every watched folder at once. It belongs
+            // here, on the one folder the picker has selected — and it has to
+            // say *this*, because `ScanEngine` returns an empty plan for a
+            // folder it could not read, which the branch below would report as
+            // "Nothing left to organize": a folder that was never looked at,
+            // described as already tidy.
+            message(state.folderStatus[target] == .unreadable
+                    ? "Ledge doesn't have permission to read this folder."
+                    : "This folder isn't available right now.")
         } else if preview.isEmpty {
             message(isScanning
                     ? "Looking through this folder…"
@@ -203,26 +214,9 @@ struct OrganizeSheet: View {
     /// sheet is sitting on top of the shelf. A batch that silently moved fewer
     /// files than the button promised is exactly the kind of lie this screen
     /// cannot afford.
-    @ViewBuilder
     private var errorBanner: some View {
-        if let error = state.lastError {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                Text(error)
-                    .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 4)
-                Button {
-                    state.clearError()
-                } label: {
-                    Image(systemName: "xmark")
-                }
-                .buttonStyle(.borderless)
-                .help(String(localized: "Dismiss"))
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 10)
+        ErrorBanner(message: state.lastError, horizontalPadding: 14, topPadding: 10) {
+            state.clearError()
         }
     }
 

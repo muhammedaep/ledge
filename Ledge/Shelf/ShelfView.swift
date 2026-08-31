@@ -30,6 +30,20 @@ struct ShelfView: View {
     /// download happened to refresh the list.
     @State private var rowStatus: [UUID: RowStatus] = [:]
 
+    /// Bumped by every `refreshRowStatus()`; a sweep that finishes after a later
+    /// one started publishes nothing.
+    ///
+    /// The same guard `AppState.refreshFolderStatus` carries, for the same
+    /// hazard, because the two are launched together from both closures below
+    /// and race the same way. `rowStatus` is replaced wholesale, so an older
+    /// sweep landing last publishes a dictionary built from a record list that
+    /// no longer exists: a download filed while it was running has no entry, and
+    /// its row sits with a generic icon until some unrelated event refreshes the
+    /// shelf. Nothing *does* the wrong thing — `ShelfRow.isStillThere()` re-reads
+    /// at gesture time — but the shelf shows a stale answer, which is precisely
+    /// what this sweep exists to prevent.
+    @State private var rowStatusGeneration = 0
+
     var body: some View {
         // The permission screen replaces the *list*, never the footer. Settings
         // and Quit are the only two routes out of this window — Ledge is an
@@ -145,8 +159,15 @@ struct ShelfView: View {
     private var footer: some View {
         HStack {
             Button("Organize Now…") { showingOrganize = true }
-                // Nothing to organize from a folder that cannot be listed.
-                .disabled(!state.hasFolderAccess)
+                // Only when there is nowhere left to organize *from*. This used
+                // to ask the all-or-nothing `hasFolderAccess`, false the moment
+                // any single watched folder was blocked — so one locked folder
+                // disabled Organize Now for the readable one beside it, the same
+                // mistake the shelf itself was moved off and this control was
+                // left behind on. Which folder is being organized is the sheet's
+                // own question, and it is the sheet that answers it: it has the
+                // picker.
+                .disabled(!state.hasUsableFolder)
             Spacer()
             SettingsLink { Image(systemName: "gearshape") }
                 .buttonStyle(.borderless)
@@ -210,49 +231,42 @@ struct ShelfView: View {
 
     /// Re-reads liveness and icon for every record currently on the shelf.
     ///
-    /// Off the main actor deliberately. Both `fileExists` and
+    /// Off the main actor deliberately. Both the liveness check and
     /// `icon(forFile:)` are filesystem reads, and a record can point at a
     /// volume that is no longer mounted — `AppState.filingRoot` contemplates
     /// exactly that — where a read blocks for the mount timeout rather than
     /// failing fast. Run per visible row on the main actor, that is a menu bar
     /// icon that does nothing when clicked.
     private func refreshRowStatus() async {
+        rowStatusGeneration += 1
+        let generation = rowStatusGeneration
         let records = state.recentRecords
-        rowStatus = await Task.detached(priority: .userInitiated) {
+
+        let swept = await Task.detached(priority: .userInitiated) {
             var status: [UUID: RowStatus] = [:]
             for record in records {
                 status[record.id] = RowStatus(
-                    isPresent: FileManager.default.fileExists(atPath: record.to.path),
+                    // `FileEntry.exists`, not `fileExists`: undo and the mover
+                    // both count a dangling symlink as a file that is there, so
+                    // a row that dimmed itself and disabled its own undo button
+                    // was describing a file the rest of the app can still move.
+                    isPresent: FileEntry.exists(atPath: record.to.path),
                     icon: NSWorkspace.shared.icon(forFile: record.to.path)
                 )
             }
             return status
         }.value
+
+        guard generation == rowStatusGeneration else { return }
+        rowStatus = swept
     }
 
-    /// `AppState` records five different failures and, until now, showed none
+    /// `AppState` records six different failures and, until now, showed none
     /// of them. For an app whose whole job is moving the user's files, a failed
     /// undo that reports nothing is worse than one that never happened.
-    @ViewBuilder
     private var errorBanner: some View {
-        if let error = state.lastError {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                Text(error)
-                    .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 4)
-                Button {
-                    state.clearError()
-                } label: {
-                    Image(systemName: "xmark")
-                }
-                .buttonStyle(.borderless)
-                .help(String(localized: "Dismiss"))
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
+        ErrorBanner(message: state.lastError, horizontalPadding: 12, topPadding: 8) {
+            state.clearError()
         }
     }
 
@@ -325,9 +339,12 @@ struct ShelfView: View {
         // every time the user picked a folder they had picked before —
         // `Project(folder:)` mints a fresh id on each call.
         let choice = Project.choosing(url, in: state.projects)
-        if !choice.wasAlreadyKnown {
-            state.updateProjects(choice.projects)
-        }
+        // A project the write refused is not one to switch to. `activeProject`
+        // looks the id up in `projects`, which no longer moves ahead of the
+        // file, so activating it would leave the preference pointing at a
+        // project this list does not contain and the header naming the default
+        // destination with no explanation.
+        guard choice.wasAlreadyKnown || state.updateProjects(choice.projects) else { return }
         state.setActiveProject(choice.project)
     }
 }

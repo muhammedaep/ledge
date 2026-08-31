@@ -78,6 +78,22 @@ final class AppState {
 
     init() {
         rules = rulesStore.load()
+        // Spec §9: the user is told once. `RulesStore` reports the fact and
+        // stops there — it has no string catalog, so the sentence has to be
+        // composed here — and until now nobody read it, so a hand-edited
+        // rules.json was quarantined and replaced by the defaults with nothing
+        // whatsoever on screen. The core produced the data and the app produced
+        // no sentence.
+        //
+        // The two cases are different news and must not share a wording. A
+        // corrupt file was moved aside, so the user's edits are recoverable and
+        // the message has to say where they went; a repaired one was read and
+        // most of it survived, with nothing to recover.
+        if rulesStore.lastLoadWasCorrupt {
+            lastError = String(localized: "Your rules file couldn't be read, so Ledge went back to the defaults. The old file was renamed, not deleted.")
+        } else if rulesStore.lastLoadWasRepaired {
+            lastError = String(localized: "Some of your rules named a folder Ledge can't use and were removed. The rest are unchanged.")
+        }
         projects = projectStore.load()
         Task { await refreshRecords() }
         Task { await refreshFolderStatus() }
@@ -159,28 +175,36 @@ final class AppState {
         preferences.watchedFolders.filter { folderStatus[$0] == .missing }
     }
 
-    /// False only when a watched folder is *blocked*, never merely absent.
-    ///
-    /// Unknown counts as fine. Until the first sweep lands, `folderStatus` is
-    /// empty and the shelf shows normally — briefly optimistic, the same trade
-    /// the row sweep makes, and the right way round: a wrong "everything is
-    /// fine" corrects itself a moment later, while a wrong "you are locked out"
-    /// is what the user would be staring at.
-    var hasFolderAccess: Bool { unreadableFolders.isEmpty }
-
     /// Whether anything at all can still be filed.
     ///
-    /// Not the same question as `hasFolderAccess`, and the difference decides
-    /// how much of the shelf is replaced. One blocked folder out of two means
-    /// filing still works from the other, so the list, its history and its undo
-    /// buttons are live and must stay on screen; only a banner is owed. The
-    /// full-screen explanation is for the case it was written for — nothing
-    /// coming in from anywhere.
+    /// This is the whole-app question, and it is deliberately *not* "is every
+    /// folder fine". One blocked folder out of two means filing still works from
+    /// the other, so the list, its history and its undo buttons are live and must
+    /// stay on screen; only a banner is owed. The full-screen explanation is for
+    /// the case it was written for — nothing coming in from anywhere.
     ///
-    /// Unknown counts as usable, for the same reason as above.
+    /// There used to be a `hasFolderAccess` beside this one, false as soon as
+    /// *any* watched folder was blocked. It is gone rather than merely unused:
+    /// the shelf was moved off it once and the Organize Now button was left
+    /// behind on it, which is how one locked folder came to disable the feature
+    /// for the readable folder next to it. A predicate whose only remaining use
+    /// is to be reached for by mistake is worth deleting.
     var hasUsableFolder: Bool {
-        preferences.watchedFolders.isEmpty
-            || preferences.watchedFolders.contains { folderStatus[$0] == .readable || folderStatus[$0] == nil }
+        preferences.watchedFolders.isEmpty || preferences.watchedFolders.contains(where: isUsable)
+    }
+
+    /// Whether *this* folder can be filed from — the question anything operating
+    /// on one folder at a time has to ask, and the one Organize Now asks, since
+    /// it works on a single folder chosen in its own picker.
+    ///
+    /// Unknown counts as usable. Until the first sweep lands `folderStatus` is
+    /// empty and everything shows normally — briefly optimistic, the same trade
+    /// the shelf's row sweep makes, and the right way round: a wrong "everything
+    /// is fine" corrects itself a moment later, while a wrong "you are locked
+    /// out" is what the user would be staring at.
+    func isUsable(_ folder: URL) -> Bool {
+        let status = folderStatus[folder]
+        return status == .readable || status == nil
     }
 
     /// Re-checks every watched folder, off the main actor.
@@ -277,12 +301,27 @@ final class AppState {
         preferences.activeProjectID = project?.id
     }
 
-    func updateProjects(_ newProjects: [Project]) {
+    /// Commits a project list. Returns whether it was written.
+    ///
+    /// Ordered exactly like `updateRules`, and for the reason its comment gives:
+    /// in-memory state follows the file rather than leading it. This used to
+    /// assign first and then `try?` the write away, so a failed save left the
+    /// menu naming projects that would be gone on next launch — and, worse,
+    /// could clear `activeProjectID` on the strength of a list that was never
+    /// written. Nothing moves unless the write lands.
+    @discardableResult
+    func updateProjects(_ newProjects: [Project]) -> Bool {
+        do {
+            try projectStore.save(newProjects)
+        } catch {
+            lastError = String(localized: "Couldn't save your projects.")
+            return false
+        }
         projects = newProjects
-        try? projectStore.save(newProjects)
         if let id = preferences.activeProjectID, !newProjects.contains(where: { $0.id == id }) {
             preferences.activeProjectID = nil   // the active project was removed
         }
+        return true
     }
 
     /// Where a file found in `foundIn` should be filed. Falls back to the
@@ -291,10 +330,12 @@ final class AppState {
     /// recreates it.
     private func filingRoot(for foundIn: URL) -> URL {
         guard let project = activeProject else { return foundIn }
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: project.folder.path, isDirectory: &isDirectory),
-              isDirectory.boolValue
-        else {
+        // `FileEntry.isDirectory`, not `fileExists(atPath:isDirectory:)` — the
+        // same question, asked through the one place that owns it. It follows
+        // symlinks deliberately: a symlinked project folder is somewhere a
+        // download can land, and a dangling one is not, which is exactly the
+        // fallback this guard exists to take.
+        guard FileEntry.isDirectory(atPath: project.folder.path) else {
             preferences.activeProjectID = nil
             lastError = String(
                 localized: "Project folder is missing — filing into \(foundIn.lastPathComponent) instead.")
