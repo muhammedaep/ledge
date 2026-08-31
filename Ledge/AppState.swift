@@ -147,9 +147,11 @@ final class AppState {
 
     /// What each watched folder's last check said. Cached, not computed on
     /// demand: `FolderAccess.of` lists a directory, which is `O(entries)` — 50ms
-    /// for a 20,000-entry Downloads folder — and blocks for the mount timeout on
-    /// an unmounted volume. Read from a view body, that is the same hazard the
-    /// shelf's row sweep was moved off the main actor to avoid.
+    /// for a 20,000-entry Downloads folder — and blocks until the mount times out
+    /// against a network volume that has stopped answering. Not against a
+    /// detached *local* volume, which measures at 0.0023 s; the same correction
+    /// the shelf's row sweep carries. Read from a view body, either way, that is
+    /// the same hazard the row sweep was moved off the main actor to avoid.
     ///
     /// The cost of caching is staleness, and the answer does change outside this
     /// process: the user grants access in System Settings, or plugs the drive
@@ -422,6 +424,34 @@ final class AppState {
             await refreshRecords()
         } catch {
             lastError = String(localized: "Couldn't undo \(record.originalName).")
+        }
+    }
+
+    /// Whether ⌘Z has anything to act on.
+    ///
+    /// Drives `.disabled` rather than an early return with an error. An empty
+    /// shelf is not a failure the user needs told about — measured on the
+    /// panel, a disabled shortcut makes `performKeyEquivalent` answer false, so
+    /// the keystroke is simply not consumed.
+    var canUndo: Bool { UndoTarget.mostRecent(in: recentRecords) != .nothing }
+
+    /// ⌘Z. Spec §7.5: undoes the most recent record, or the whole batch it
+    /// belongs to.
+    ///
+    /// *Which* of those it is, is `UndoTarget`'s decision, in LedgeCore with
+    /// tests — it turns on `batchID`, and a rule that picks between two
+    /// different filesystem operations does not belong in a keyboard handler.
+    /// This method only dispatches, so both paths keep the existing guards and
+    /// the existing `lastError` reporting: a file gone from its recorded path
+    /// still surfaces "Couldn't undo …" rather than failing silently.
+    func undoMostRecent() async {
+        switch UndoTarget.mostRecent(in: recentRecords) {
+        case .nothing:
+            break
+        case .record(let record):
+            await undo(record)
+        case .batch(let batchID):
+            await undoBatch(batchID)
         }
     }
 

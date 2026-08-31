@@ -10,10 +10,15 @@ import LedgeCore
 /// app is underneath.
 ///
 /// `isPresent` and `icon` are handed in by `ShelfView` rather than read here.
-/// Both are filesystem reads, and a record can point at a disconnected volume —
-/// `AppState.filingRoot` explicitly contemplates one — so doing them in `body`,
-/// once per visible row, on the main actor, would block the popover for the
-/// mount timeout: the user clicks the menu bar icon and nothing opens.
+/// Both are filesystem reads, done once per visible row, and the shelf has to
+/// open the instant the menu bar icon is clicked.
+///
+/// The stall this actually avoids is an unresponsive *network* mount, where a
+/// stat blocks until the mount times out. It is deliberately no longer claimed
+/// for "a disconnected volume": a detached local volume was measured answering
+/// in 0.0023 s, so for that case this sweep is precautionary rather than
+/// load-bearing. Said the old way, the justification was disprovable in thirty
+/// seconds — which is an invitation to delete the code it defends.
 struct ShelfRow: View {
     let record: MoveRecord
     /// Whether the file was there as of the shelf's last sweep. Drives how the

@@ -44,6 +44,10 @@ struct ShelfView: View {
     /// what this sweep exists to prevent.
     @State private var rowStatusGeneration = 0
 
+    /// This view's own panel, so the refresh below can tell it from Settings
+    /// being brought forward. Same device, same reason, as `OrganizeSheet`'s.
+    @State private var shelfWindow: NSWindow?
+
     var body: some View {
         // The permission screen replaces the *list*, never the footer. Settings
         // and Quit are the only two routes out of this window — Ledge is an
@@ -69,8 +73,11 @@ struct ShelfView: View {
             Divider()
 
             footer
+
+            undoShortcut
         }
         .frame(width: 360)
+        .background(WindowReader { shelfWindow = $0 })
         .sheet(isPresented: $showingOrganize) {
             OrganizeSheet()
                 .environment(state)
@@ -92,8 +99,29 @@ struct ShelfView: View {
         // changes outside this process — in System Settings, or when a drive is
         // plugged back in — and the popover opening is exactly when a stale
         // answer would be seen.
+        //
+        // Filtered to this panel, the way `OrganizeSheet` already filters to
+        // its own, because the notification is global: unfiltered, merely
+        // opening Settings fired a full row sweep *and* an `O(entries)` access
+        // check per watched folder. Both run off the main actor, so it was
+        // never a freeze — just work nobody asked for, on the exact signal that
+        // means the shelf is not being looked at.
+        //
+        // The Organize sheet counts as this panel deliberately. It is presented
+        // from here and reads `state.isUsable(_:)` for the folder it has
+        // selected, so its window becoming key is precisely when that answer
+        // must not be stale. Its `sheetParent` is this panel, which is what
+        // distinguishes it from Settings.
         .onReceive(NotificationCenter.default.publisher(
-            for: NSWindow.didBecomeKeyNotification)) { _ in
+            for: NSWindow.didBecomeKeyNotification)) { note in
+            // `shelfWindow` is bound first on purpose: both it and
+            // `becameKey.sheetParent` are optional, and before this view has
+            // been placed in a window `nil === nil` would match every plain
+            // window in the app — the opposite of a filter.
+            guard let shelfWindow,
+                  let becameKey = note.object as? NSWindow,
+                  becameKey === shelfWindow || becameKey.sheetParent === shelfWindow
+            else { return }
             Task {
                 await refreshRowStatus()
                 await state.refreshFolderStatus()
@@ -183,6 +211,38 @@ struct ShelfView: View {
         .padding(10)
     }
 
+    /// ⌘Z, which spec §7.5 promised and nothing ever built.
+    ///
+    /// A zero-sized `Button` rather than an `onKeyPress` or a menu command,
+    /// because that is what scopes it. SwiftUI registers a `keyboardShortcut`
+    /// with the window whose hierarchy holds the button, so this one is live
+    /// exactly while the shelf panel is key. Settings is a separate window: ⌘Z
+    /// there stays text undo in a rules field, which is what the user means by
+    /// it while typing a category name.
+    ///
+    /// All of that was measured on a `MenuBarExtra(style: .window)` panel rather
+    /// than assumed, since that panel is already known to treat `.onAppear` and
+    /// `.task` unlike a normal window. Driving the status item to open the panel
+    /// and handing it a real ⌘Z event: the panel is key, `performKeyEquivalent`
+    /// returns true, and the action runs. Disabled, it returns false and the
+    /// action does not run — which is why `canUndo` drives `.disabled` and not
+    /// an early return: an empty shelf leaves the keystroke unconsumed instead
+    /// of raising an error about nothing.
+    ///
+    /// The frame is zeroed rather than only `.hidden()`, which still takes
+    /// layout space and would open a button-sized gap under the footer. This
+    /// exact chain was the one verified.
+    private var undoShortcut: some View {
+        Button("Undo") {
+            Task { await state.undoMostRecent() }
+        }
+        .keyboardShortcut("z", modifiers: .command)
+        .disabled(!state.canUndo)
+        .frame(width: 0, height: 0)
+        .opacity(0)
+        .accessibilityHidden(true)
+    }
+
     /// Watched folders Ledge cannot file from, and why, for every case the
     /// permission screen is not already up for.
     ///
@@ -232,11 +292,15 @@ struct ShelfView: View {
     /// Re-reads liveness and icon for every record currently on the shelf.
     ///
     /// Off the main actor deliberately. Both the liveness check and
-    /// `icon(forFile:)` are filesystem reads, and a record can point at a
-    /// volume that is no longer mounted — `AppState.filingRoot` contemplates
-    /// exactly that — where a read blocks for the mount timeout rather than
-    /// failing fast. Run per visible row on the main actor, that is a menu bar
-    /// icon that does nothing when clicked.
+    /// `icon(forFile:)` are filesystem reads, run once per record, and a menu
+    /// bar icon that does nothing when clicked is the worst failure this view
+    /// has.
+    ///
+    /// The read that genuinely blocks is one against an unresponsive network
+    /// mount, which stalls until the mount times out. Not a *local* volume being
+    /// detached, which this comment used to claim and which measures at 0.0023 s
+    /// — precautionary there, and cheap enough to keep on that basis, but the
+    /// reason had to stop being one anyone could disprove in half a minute.
     private func refreshRowStatus() async {
         rowStatusGeneration += 1
         let generation = rowStatusGeneration

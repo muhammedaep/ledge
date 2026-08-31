@@ -21,6 +21,7 @@
 		A1B2C3D400114455AA660018 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660017 /* Localizable.xcstrings */; };
 		A1B2C3D400114455AA66001B /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66001A /* InfoPlist.xcstrings */; };
 		A1B2C3D400114455AA66001D /* ErrorBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66001C /* ErrorBanner.swift */; };
+		A1B2C3D400114455AA66001F /* WindowReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66001E /* WindowReader.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,6 +30,7 @@
 		79F2B1F6E27F4C7DAA626279 /* ShelfView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfView.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA660001 /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA66001C /* ErrorBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorBanner.swift; sourceTree = "<group>"; };
+		A1B2C3D400114455AA66001E /* WindowReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowReader.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA660003 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA660008 /* ShelfRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfRow.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA66000A /* OrganizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizeSheet.swift; sourceTree = "<group>"; };
@@ -67,6 +69,7 @@
 				A1B2C3D400114455AA660003 /* AppState.swift */,
 				A1B2C3D400114455AA660001 /* Preferences.swift */,
 				A1B2C3D400114455AA66001C /* ErrorBanner.swift */,
+				A1B2C3D400114455AA66001E /* WindowReader.swift */,
 				19C7F09942DB4C26BB9C6052 /* Shelf */,
 				A1B2C3D400114455AA66000E /* Organize */,
 				A1B2C3D400114455AA660014 /* Onboarding */,
@@ -209,6 +212,7 @@
 				A1B2C3D400114455AA660004 /* AppState.swift in Sources */,
 				A1B2C3D400114455AA660002 /* Preferences.swift in Sources */,
 				A1B2C3D400114455AA66001D /* ErrorBanner.swift in Sources */,
+				A1B2C3D400114455AA66001F /* WindowReader.swift in Sources */,
 				23262EB335314923875619E8 /* ShelfView.swift in Sources */,
 				A1B2C3D400114455AA660009 /* ShelfRow.swift in Sources */,
 				A1B2C3D400114455AA66000B /* OrganizeSheet.swift in Sources */,
