@@ -22,7 +22,24 @@ struct GeneralPane: View {
             Section("Watched folders") {
                 ForEach(preferences.watchedFolders, id: \.self) { folder in
                     HStack {
-                        Text(folder.path).lineLimit(1).truncationMode(.head)
+                        // This is where a folder that has gone is meant to be
+                        // dealt with, so it has to be visible here rather than
+                        // only in the shelf's banner.
+                        if state.folderStatus[folder] == .missing {
+                            Image(systemName: "externaldrive.trianglebadge.exclamationmark")
+                                .foregroundStyle(.orange)
+                                .help(String(localized: "This folder isn't there right now."))
+                        } else if state.folderStatus[folder] == .unreadable {
+                            Image(systemName: "lock.fill")
+                                .foregroundStyle(.orange)
+                                .help(String(localized: "Ledge doesn't have permission to read this folder."))
+                        }
+
+                        Text(folder.path)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                            .foregroundStyle(state.folderStatus[folder] == .readable
+                                             ? .primary : .secondary)
                         Spacer()
                         Button(role: .destructive) {
                             state.removeWatchedFolder(folder)
@@ -31,7 +48,9 @@ struct GeneralPane: View {
                         }
                         .buttonStyle(.borderless)
                         // Nothing left to watch would be an app with no
-                        // purpose and no sign of why.
+                        // purpose and no sign of why. To replace the last
+                        // folder — including one that has gone missing — add
+                        // the new one first, then remove this.
                         .disabled(preferences.watchedFolders.count == 1)
                     }
                 }
@@ -49,25 +68,10 @@ struct GeneralPane: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(state.projects) { project in
-                    HStack {
-                        TextField("Name", text: Binding(
-                            get: { project.name },
-                            set: { rename(project, to: $0) }
-                        ))
-                        .textFieldStyle(.plain)
-
-                        Text(project.folder.path)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.head)
-
-                        Button(role: .destructive) {
-                            state.updateProjects(state.projects.filter { $0.id != project.id })
-                        } label: {
-                            Image(systemName: "minus.circle")
-                        }
-                        .buttonStyle(.borderless)
+                    ProjectRow(project: project) { renamed in
+                        rename(project, to: renamed)
+                    } remove: {
+                        state.updateProjects(state.projects.filter { $0.id != project.id })
                     }
                 }
                 Button("Add Project…", action: addProject)
@@ -87,10 +91,15 @@ struct GeneralPane: View {
         .formStyle(.grouped)
     }
 
+    /// Applies a finished rename. `Project.renamed` decides what a blank name
+    /// means — in LedgeCore, where it is tested — rather than this pane storing
+    /// whatever was typed.
     private func rename(_ project: Project, to newName: String) {
         var updated = state.projects
         guard let index = updated.firstIndex(where: { $0.id == project.id }) else { return }
-        updated[index].name = newName
+        let renamed = updated[index].renamed(to: newName)
+        guard renamed != updated[index] else { return }   // nothing changed: no write
+        updated[index] = renamed
         state.updateProjects(updated)
     }
 
@@ -119,5 +128,63 @@ struct GeneralPane: View {
         NSApplication.shared.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK else { return nil }
         return panel.url
+    }
+}
+
+/// One project: rename in place, or remove.
+///
+/// The rename is held locally and committed on Return or when focus leaves,
+/// rather than on every keystroke. Committing per keystroke re-encoded and
+/// rewrote `projects.json` for every character typed, and — worse — ran the
+/// blank-name rule mid-word, so clearing the field to retype snapped the name
+/// back to the folder's before the user had typed anything.
+private struct ProjectRow: View {
+    let project: Project
+    let rename: (String) -> Void
+    let remove: () -> Void
+
+    @State private var draft: String
+    @FocusState private var isEditing: Bool
+
+    init(project: Project, rename: @escaping (String) -> Void, remove: @escaping () -> Void) {
+        self.project = project
+        self.rename = rename
+        self.remove = remove
+        _draft = State(initialValue: project.name)
+    }
+
+    var body: some View {
+        HStack {
+            TextField("Name", text: $draft)
+                .textFieldStyle(.plain)
+                .focused($isEditing)
+                .onSubmit(commit)
+                .onChange(of: isEditing) { _, editing in
+                    if !editing { commit() }
+                }
+                // Someone else can rename this project — the shelf's menu, or a
+                // second Settings window — while this row is on screen.
+                .onChange(of: project.name) { _, newName in
+                    if !isEditing { draft = newName }
+                }
+
+            Text(project.folder.path)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.head)
+
+            Button(role: .destructive, action: remove) {
+                Image(systemName: "minus.circle")
+            }
+            .buttonStyle(.borderless)
+        }
+    }
+
+    private func commit() {
+        rename(draft)
+        // Show what was actually stored, which is not always what was typed:
+        // a blank name falls back to the folder's.
+        draft = project.renamed(to: draft).name
     }
 }

@@ -31,19 +31,59 @@ struct ShelfView: View {
     @State private var rowStatus: [UUID: RowStatus] = [:]
 
     var body: some View {
-        // A watched folder Ledge cannot read means nothing will ever be filed,
-        // so the shelf would be a permanently empty list with no explanation.
-        // The reason takes its place until access is granted.
-        if state.hasFolderAccess {
-            shelf
-        } else {
-            PermissionView()
+        // The permission screen replaces the *list*, never the footer. Settings
+        // and Quit are the only two routes out of this window — Ledge is an
+        // accessory app, so there is no app menu behind it — and a state that
+        // hides them is a state the user cannot leave except through Activity
+        // Monitor. That is worse than the problem the screen exists to explain,
+        // and it was reachable by merely ejecting a drive.
+        VStack(alignment: .leading, spacing: 0) {
+            if state.hasFolderAccess {
+                shelf
+            } else {
+                PermissionView()
+            }
+
+            Divider()
+
+            footer
+        }
+        .frame(width: 360)
+        .sheet(isPresented: $showingOrganize) {
+            OrganizeSheet()
+                .environment(state)
+        }
+        // Fires when the shelf appears, and again whenever the record list
+        // changes under it.
+        .task(id: state.recentRecords.map(\.id)) {
+            await refreshRowStatus()
+            await state.refreshFolderStatus()
+        }
+        // A second, independent trigger, because the first depends on something
+        // this session could not verify: whether SwiftUI re-runs `.task` each
+        // time a `MenuBarExtra(style: .window)` popover is shown, or creates the
+        // content once and keeps it alive. The popover's panel becomes key when
+        // it opens, so this covers the case where the view survives and `.task`
+        // does not re-run. Either trigger alone is enough; both are cheap.
+        //
+        // Folder access rides the same two signals, for the same reason: it
+        // changes outside this process — in System Settings, or when a drive is
+        // plugged back in — and the popover opening is exactly when a stale
+        // answer would be seen.
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSWindow.didBecomeKeyNotification)) { _ in
+            Task {
+                await refreshRowStatus()
+                await state.refreshFolderStatus()
+            }
         }
     }
 
     private var shelf: some View {
         VStack(alignment: .leading, spacing: 0) {
             destinationHeader
+
+            unavailableFolderBanner
 
             errorBanner
 
@@ -83,43 +123,60 @@ struct ShelfView: View {
                 }
                 .frame(maxHeight: 340)
             }
+        }
+    }
 
-            Divider()
-
-            HStack {
-                Button("Organize Now…") { showingOrganize = true }
-                Spacer()
-                SettingsLink { Image(systemName: "gearshape") }
-                    .buttonStyle(.borderless)
-                Button {
-                    NSApplication.shared.terminate(nil)
-                } label: {
-                    Image(systemName: "power")
-                }
+    /// Organize, Settings and Quit. Rendered outside `shelf` so that no state —
+    /// including one where Ledge cannot read a thing — can take them away.
+    private var footer: some View {
+        HStack {
+            Button("Organize Now…") { showingOrganize = true }
+                // Nothing to organize from a folder that cannot be listed.
+                .disabled(!state.hasFolderAccess)
+            Spacer()
+            SettingsLink { Image(systemName: "gearshape") }
                 .buttonStyle(.borderless)
-                .help(String(localized: "Quit Ledge"))
+                .help(String(localized: "Settings"))
+            Button {
+                NSApplication.shared.terminate(nil)
+            } label: {
+                Image(systemName: "power")
             }
-            .padding(10)
+            .buttonStyle(.borderless)
+            .help(String(localized: "Quit Ledge"))
         }
-        .frame(width: 360)
-        .sheet(isPresented: $showingOrganize) {
-            OrganizeSheet()
-                .environment(state)
-        }
-        // Fires when the shelf appears, and again whenever the record list
-        // changes under it.
-        .task(id: state.recentRecords.map(\.id)) {
-            await refreshRowStatus()
-        }
-        // A second, independent trigger, because the first depends on something
-        // this session could not verify: whether SwiftUI re-runs `.task` each
-        // time a `MenuBarExtra(style: .window)` popover is shown, or creates the
-        // content once and keeps it alive. The popover's panel becomes key when
-        // it opens, so this covers the case where the view survives and `.task`
-        // does not re-run. Either trigger alone is enough; both are cheap.
-        .onReceive(NotificationCenter.default.publisher(
-            for: NSWindow.didBecomeKeyNotification)) { _ in
-            Task { await refreshRowStatus() }
+        .padding(10)
+    }
+
+    /// A watched folder that is simply *gone* — an ejected drive, a deleted
+    /// directory. Not a permission problem, so it must not raise the permission
+    /// screen: no consent dialog can grant a folder that is not there. Filing
+    /// carries on for every other watched folder, and this says which one
+    /// stopped and where to remove it.
+    @ViewBuilder
+    private var unavailableFolderBanner: some View {
+        let missing = state.missingFolders
+        if !missing.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "externaldrive.trianglebadge.exclamationmark")
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(missing.count == 1
+                         ? String(localized: "A watched folder isn't there right now.")
+                         : String(localized: "\(missing.count) watched folders aren't there right now."))
+                        .font(.caption)
+                    Text(missing.map(\.lastPathComponent).joined(separator: ", "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                }
+                Spacer(minLength: 4)
+                SettingsLink { Text("Settings…").font(.caption) }
+                    .buttonStyle(.borderless)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
         }
     }
 

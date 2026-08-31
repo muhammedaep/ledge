@@ -44,23 +44,28 @@ public extension Project {
     /// reached by a trailing slash, a `..` component, or a symlink counts once.
     /// The symlink case is not hypothetical on macOS: `/tmp` and `/var` are
     /// symlinks into `/private`, and an open panel can hand back either form.
+    /// The comparison itself is `FolderIdentity`'s, shared with watched folders,
+    /// which had the same rule to apply and were applying a weaker one.
     static func choosing(_ folder: URL, in projects: [Project]) -> Choice {
-        let key = folderKey(folder)
-        if let existing = projects.first(where: { folderKey($0.folder) == key }) {
+        if let existing = projects.first(where: { FolderIdentity.sameFolder($0.folder, folder) }) {
             return Choice(projects: projects, project: existing, wasAlreadyKnown: true)
         }
         let project = Project(folder: folder)
         return Choice(projects: projects + [project], project: project, wasAlreadyKnown: false)
     }
 
-    /// Two URLs name the same project folder when this matches.
+    /// Renaming to nothing at all.
     ///
-    /// `resolvingSymlinksInPath()` reads the filesystem, and for a path that
-    /// does not exist it resolves the part that does and leaves the rest
-    /// alone. That is the behaviour we want here rather than a limitation: a
-    /// project whose folder has been deleted or unmounted still compares equal
-    /// to itself, so it is never silently duplicated while it is away.
-    private static func folderKey(_ folder: URL) -> String {
-        folder.standardizedFileURL.resolvingSymlinksInPath().path
+    /// A name is what the destination menu and the shelf header show, so an
+    /// empty or whitespace-only one leaves the user looking at a blank menu item
+    /// with no way to tell which project it is. Blank falls back to the folder's
+    /// own name — the same default `init` uses — rather than being rejected,
+    /// because the user's intent when they clear the field and click away is
+    /// "unname it", not "fail".
+    func renamed(to newName: String) -> Project {
+        var copy = self
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        copy.name = trimmed.isEmpty ? folder.lastPathComponent : trimmed
+        return copy
     }
 }

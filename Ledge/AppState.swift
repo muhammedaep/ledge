@@ -65,6 +65,7 @@ final class AppState {
         rules = rulesStore.load()
         projects = projectStore.load()
         Task { await refreshRecords() }
+        Task { await refreshFolderStatus() }
     }
 
     // MARK: - Watching
@@ -113,37 +114,76 @@ final class AppState {
 
     // MARK: - Watched folders
 
-    /// True when every watched folder can actually be read. A declined consent
-    /// prompt shows up here rather than as silence: `~/Downloads` is
-    /// TCC-protected, and without access Ledge would sit in the menu bar
-    /// looking healthy and filing nothing, forever.
+    /// What each watched folder's last check said. Cached, not computed on
+    /// demand: `FolderAccess.of` lists a directory, which is `O(entries)` — 50ms
+    /// for a 20,000-entry Downloads folder — and blocks for the mount timeout on
+    /// an unmounted volume. Read from a view body, that is the same hazard the
+    /// shelf's row sweep was moved off the main actor to avoid.
     ///
-    /// Deliberately computed rather than cached — the answer changes outside
-    /// this process (in System Settings), with no notification to observe, so a
-    /// cached "no" would survive the user granting access.
-    var hasFolderAccess: Bool { unreadableFolders.isEmpty }
+    /// The cost of caching is staleness, and the answer does change outside this
+    /// process: the user grants access in System Settings, or plugs the drive
+    /// back in, with no notification to observe. So it is refreshed on every
+    /// signal that suggests it may have moved — see `refreshFolderStatus()`.
+    private(set) var folderStatus: [URL: FolderAccess] = [:]
 
-    /// The watched folders behind that answer, so the permission screen can name
-    /// the folder the user actually has to grant — which is not always
-    /// Downloads once they have added folders of their own.
+    /// Watched folders that exist but cannot be read — a declined or
+    /// never-granted TCC prompt. This is the one the user can actually fix by
+    /// granting permission.
     var unreadableFolders: [URL] {
-        preferences.watchedFolders.filter { folder in
-            (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) == nil
-        }
+        preferences.watchedFolders.filter { folderStatus[$0] == .unreadable }
     }
 
+    /// Watched folders that are not there at all: deleted, or on a volume that
+    /// has been ejected. Not a permission problem, and must never be presented
+    /// as one — no consent dialog can grant a folder that does not exist.
+    var missingFolders: [URL] {
+        preferences.watchedFolders.filter { folderStatus[$0] == .missing }
+    }
+
+    /// False only when a watched folder is *blocked*, never merely absent.
+    ///
+    /// Unknown counts as fine. Until the first sweep lands, `folderStatus` is
+    /// empty and the shelf shows normally — briefly optimistic, the same trade
+    /// the row sweep makes, and the right way round: a wrong "everything is
+    /// fine" corrects itself a moment later, while a wrong "you are locked out"
+    /// is what the user would be staring at.
+    var hasFolderAccess: Bool { unreadableFolders.isEmpty }
+
+    /// Re-checks every watched folder, off the main actor.
+    ///
+    /// Called on launch, whenever the watched folders change, and from the shelf
+    /// on the same signals that refresh row liveness — the popover opening is
+    /// exactly when a stale answer would be seen.
+    func refreshFolderStatus() async {
+        let folders = preferences.watchedFolders
+        folderStatus = await Task.detached(priority: .userInitiated) {
+            var status: [URL: FolderAccess] = [:]
+            for folder in folders {
+                status[folder] = FolderAccess.of(folder)
+            }
+            return status
+        }.value
+    }
+
+    /// Adding a folder that is already watched by another spelling would open a
+    /// second `O_EVTONLY` descriptor on the same vnode and report every new file
+    /// twice. `FolderIdentity` owns that comparison, shared with projects.
     func addWatchedFolder(_ url: URL) {
-        guard !preferences.watchedFolders.contains(url) else { return }
-        preferences.watchedFolders.append(url)
+        let updated = FolderIdentity.adding(url, to: preferences.watchedFolders)
+        guard updated.count != preferences.watchedFolders.count else { return }
+        preferences.watchedFolders = updated
         startWatching()
+        Task { await refreshFolderStatus() }
     }
 
     /// Never removes the last one: with no watched folders the app would run
     /// with nothing to do and no visible reason why.
     func removeWatchedFolder(_ url: URL) {
         guard preferences.watchedFolders.count > 1 else { return }
-        preferences.watchedFolders.removeAll { $0 == url }
+        preferences.watchedFolders = FolderIdentity.removing(url, from: preferences.watchedFolders)
+        folderStatus[url] = nil
         startWatching()
+        Task { await refreshFolderStatus() }
     }
 
     // MARK: - Rules and projects

@@ -1,11 +1,18 @@
 import AppKit
 import SwiftUI
 
-/// Shown in place of the shelf when Ledge cannot read a watched folder.
+/// Shown in place of the shelf's list when Ledge cannot *read* a watched folder.
 ///
 /// Without it, a declined consent prompt produces an app that looks perfectly
 /// healthy in the menu bar and files nothing, forever — the failure has to
 /// explain itself somewhere, and this is the only surface the user opens.
+///
+/// Only for a folder that is there and refuses to be read. A folder that is
+/// merely gone (ejected drive, deleted directory) is not a permission problem
+/// and gets the shelf's unavailable-folder banner instead; offering Privacy
+/// Settings for it would send the user to a dialog that cannot grant anything.
+/// The shelf keeps its footer around this view, so Settings and Quit stay
+/// reachable while it is up.
 struct PermissionView: View {
     @Environment(AppState.self) private var state
 
@@ -35,7 +42,10 @@ struct PermissionView: View {
             Button("Open Privacy Settings", action: openPrivacySettings)
         }
         .padding(16)
-        .frame(width: 360)
+        // The width comes from the shelf, which wraps this in the panel that
+        // also carries Settings and Quit — this view is the *list* being
+        // replaced, not the whole window.
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var blockedFolders: [URL] { state.unreadableFolders }
