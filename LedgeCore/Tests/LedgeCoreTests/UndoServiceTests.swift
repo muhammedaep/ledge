@@ -105,3 +105,47 @@ import Foundation
     #expect(remaining.map(\.id) == [missing.id], "the skipped file's record must survive so it stays individually undoable")
     #expect(journal.records.count == 1)
 }
+
+/// A record whose file is a dangling symlink describes a file that is still
+/// there. `fileExists` resolves the link and says otherwise, so undo refused a
+/// move `FileMover` performs happily — and the user's only route back was to
+/// delete the link by hand.
+@Test func undoRestoresARecordWhoseFileIsADanglingSymlink() throws {
+    let temp = try TempDirectory()
+    let link = try temp.makeSymlink("Documents/report.pdf", to: "/nonexistent/target")
+    let journal = MoveJournal(directory: temp.url)
+    let record = MoveRecord(originalName: "report.pdf", from: temp.url, to: link)
+    try journal.append(record)
+
+    let restored = try UndoService(mover: FileMover(), journal: journal).undo(record)
+
+    #expect(restored == temp.url.appendingPathComponent("report.pdf"))
+    var info = stat()
+    #expect(lstat(restored.path, &info) == 0)
+    #expect(journal.records.isEmpty)
+}
+
+/// The batch case, which fails differently and worse. `undoBatch` skips a
+/// record it believes is gone, so a dangling link was silently left behind
+/// while every other record in the batch was restored.
+@Test func undoBatchRestoresADanglingSymlinkAlongsideTheRest() throws {
+    let temp = try TempDirectory()
+    let mover = FileMover()
+    let journal = MoveJournal(directory: temp.url)
+    let batch = UUID()
+    let dest = temp.url.appendingPathComponent("Documents", isDirectory: true)
+
+    let moved = try mover.move(try temp.writeFile("a.pdf"), into: dest)
+    try journal.append(MoveRecord(originalName: "a.pdf", from: temp.url, to: moved, batchID: batch))
+
+    let link = try temp.makeSymlink("Documents/b.pdf", to: "/nonexistent/target")
+    try journal.append(MoveRecord(originalName: "b.pdf", from: temp.url, to: link, batchID: batch))
+
+    let restored = try UndoService(mover: mover, journal: journal).undoBatch(batch)
+
+    #expect(restored.count == 2)
+    var info = stat()
+    #expect(lstat(temp.url.appendingPathComponent("b.pdf").path, &info) == 0,
+            "the link belongs back where it came from, like every other record")
+    #expect(journal.records.isEmpty, "nothing was skipped, so nothing is left behind")
+}

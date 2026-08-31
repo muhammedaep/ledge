@@ -345,3 +345,22 @@ func isNameCollisionMatchesOnlyTheClobberRefusal(domain: String, code: Int, expe
     #expect(final.lastPathComponent == "a (1).pdf")
     #expect(try String(contentsOf: target, encoding: .utf8) == "target")
 }
+
+/// The mirror of `availableURL`'s rule, on the way in rather than on the way
+/// out. `availableURL` already treats a dangling link as occupying a name; the
+/// source guard was still asking `fileExists`, which resolves the link and
+/// answers false. So a dangling link was unmovable — reported as `sourceMissing`
+/// for an entry sitting right there, which `moveItem` moves without complaint.
+@Test func movesADanglingSymlinkTheWayItMovesAnythingElse() throws {
+    let temp = try TempDirectory()
+    let link = try temp.makeSymlink("report.pdf", to: "/nonexistent/target")
+    let dest = temp.url.appendingPathComponent("Documents", isDirectory: true)
+
+    let final = try FileMover().move(link, into: dest)
+
+    #expect(final == dest.appendingPathComponent("report.pdf"))
+    var moved = stat()
+    #expect(lstat(final.path, &moved) == 0, "the link must be at the destination")
+    var origin = stat()
+    #expect(lstat(link.path, &origin) != 0, "and gone from where it was")
+}

@@ -16,9 +16,13 @@ public struct UndoService {
         self.journal = journal
     }
 
+    /// `FileEntry.exists`, not `fileExists`: this is the same "is the file
+    /// still there" question `FileMover` answers with `lstat`, and asking it
+    /// the other way made undo refuse a dangling symlink that the mover moves
+    /// happily — a file the user could see, reported as gone.
     @discardableResult
     public func undo(_ record: MoveRecord) throws -> URL {
-        guard FileManager.default.fileExists(atPath: record.to.path) else {
+        guard FileEntry.exists(atPath: record.to.path) else {
             throw UndoError.fileNoLongerAtRecordedPath(record.to)
         }
         let restored = try mover.move(record.to, into: record.from)
@@ -36,7 +40,7 @@ public struct UndoService {
     public func undoBatch(_ batchID: UUID) throws -> [URL] {
         var restored: [URL] = []
         for record in journal.records(inBatch: batchID) {
-            guard FileManager.default.fileExists(atPath: record.to.path) else { continue }
+            guard FileEntry.exists(atPath: record.to.path) else { continue }
             restored.append(try mover.move(record.to, into: record.from))
             try journal.remove(id: record.id)
         }

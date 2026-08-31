@@ -21,6 +21,18 @@ final class TempDirectory {
         return target
     }
 
+    /// A symlink at `name` pointing at `target`, which does not have to exist.
+    /// The dangling case is the interesting one: `fileExists` reports it
+    /// absent, `lstat` reports it present, and `moveItem` moves it happily.
+    @discardableResult
+    func makeSymlink(_ name: String, to target: String) throws -> URL {
+        let link = url.appendingPathComponent(name)
+        try FileManager.default.createDirectory(
+            at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: target)
+        return link
+    }
+
     @discardableResult
     func makeDirectory(_ name: String) throws -> URL {
         let target = url.appendingPathComponent(name, isDirectory: true)
