@@ -59,6 +59,7 @@ public final class FolderWatcher: @unchecked Sendable {
     private var _descriptorsOpened = 0
     private var _descriptorsClosed = 0
     private var generation = 0
+    private var pendingSettleCount = 0
 
     /// Folders currently unwatched because they don't exist (never existed, were
     /// deleted, or their volume unmounted). Safe to read from any thread.
@@ -279,8 +280,21 @@ public final class FolderWatcher: @unchecked Sendable {
         let previous = snapshots[folder] ?? DirectorySnapshot(entries: [])
 
         if current.entries.isEmpty, !previous.entries.isEmpty {
+            // Generation-guarded for the same reason a scheduled delivery is
+            // (see commitLocked): this closure runs later, on `queue`, after
+            // an arbitrary delay. If stop() runs in the meantime, it must
+            // not resurrect anything — but unlike a delivery, what
+            // confirmEmptiness does when unguarded is far worse than
+            // re-emitting one stale event: finding this folder "confirmed
+            // gone" calls markMissingLocked, which calls
+            // ensureReconnectTimerLocked, re-arming the reconnect poll on a
+            // watcher that stop() already tore down. That poll then keeps
+            // running indefinitely, can reopen a descriptor, and can emit
+            // again — unbounded in time, not a one-shot stale event.
+            let settleGeneration = generation
+            pendingSettleCount += 1
             queue.asyncAfter(deadline: .now() + emptinessSettleDelay) { [weak self] in
-                self?.confirmEmptiness(of: folder)
+                self?.confirmEmptiness(of: folder, generation: settleGeneration)
             }
             return
         }
@@ -290,8 +304,16 @@ public final class FolderWatcher: @unchecked Sendable {
 
     /// Re-checked outcome of an abrupt non-empty-to-empty transition: either
     /// the folder is confirmed gone by now (preserve the baseline, flag
-    /// unavailable) or it genuinely is just empty (commit that).
-    private func confirmEmptiness(of folder: URL) {
+    /// unavailable) or it genuinely is just empty (commit that). Dropped
+    /// entirely if `stop()`/`start()` has run since this was scheduled — see
+    /// `rescan`.
+    private func confirmEmptiness(of folder: URL, generation settleGeneration: Int) {
+        pendingSettleCount -= 1
+        // Runs on `queue` already (scheduled via queue.asyncAfter), so
+        // reading `generation` directly — no cross-queue hop needed here,
+        // unlike the delivery closure's check.
+        guard generation == settleGeneration else { return }
+
         guard FileManager.default.fileExists(atPath: folder.path) else {
             markMissingLocked(folder)
             return
@@ -329,6 +351,12 @@ public final class FolderWatcher: @unchecked Sendable {
         deliveryQueue.async { [weak self] in
             guard let self else { return }
             guard self.queue.sync(execute: { self.generation }) == deliveryGeneration else { return }
+            // Note: this check only stops a delivery that hasn't started yet.
+            // A callback already past this guard (already running) is not
+            // interrupted by a concurrent stop() — it runs to completion.
+            // That's intentional, not a defect: the generation check's job
+            // is to drop stale, not-yet-started work, not to cancel a
+            // callback already in flight.
             callback(new)
         }
     }
@@ -359,5 +387,15 @@ public final class FolderWatcher: @unchecked Sendable {
     /// Whether the reconnect poll is currently running.
     var isReconnectTimerRunningForTesting: Bool {
         queue.sync { reconnectTimer != nil }
+    }
+
+    /// Whether an emptiness-settle check (see `rescan`/`confirmEmptiness`) is
+    /// currently scheduled and hasn't run yet. Lets a test synchronize on
+    /// "the settle check has actually been scheduled" or "it has actually
+    /// fired" instead of guessing how long that takes under real filesystem
+    /// events and (for the latter) real dispatch timing, both of which are
+    /// unreliable to estimate under this file's parallel test execution.
+    var hasPendingEmptinessSettleForTesting: Bool {
+        queue.sync { pendingSettleCount > 0 }
     }
 }

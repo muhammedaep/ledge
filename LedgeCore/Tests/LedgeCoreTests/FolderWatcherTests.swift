@@ -219,17 +219,29 @@ import Foundation
     // stop() leaked its descriptor, source and repeating timer forever —
     // DispatchSource keeps a resumed-but-uncancelled source alive even after
     // every strong reference to it is gone.
+    //
+    // Round 3, finding 4: checking only the descriptor *number* is flaky
+    // under Swift Testing's default parallel execution — fd 3 tends to be
+    // the lowest free descriptor, so it can be re-grabbed by an unrelated
+    // concurrent test's open() inside the polling gap, making a stale
+    // captured number look "still open" by coincidence. Serializing this
+    // test wouldn't fix it (Swift Testing parallelizes the whole process,
+    // not just this file), and comparing descriptorLeakBalanceForTesting
+    // can't either (the watcher is already deallocated by the time we'd
+    // check). Checking the descriptor's *identity* — what path it actually
+    // points at, via F_GETPATH — is immune to both: a closed descriptor
+    // fails outright, and a reused one resolves to a different path.
     let temp = try TempDirectory()
     var watcher: FolderWatcher? = FolderWatcher(folders: [temp.url]) { _ in }
     watcher?.start()
     let descriptor = try #require(watcher?.descriptorForTesting(temp.url))
-    #expect(isOpenDescriptor(descriptor))
+    #expect(isDescriptorOpenOnFolder(descriptor, at: temp.url))
 
     watcher = nil // dropped without calling stop()
 
-    try await waitUntil(timeout: .seconds(5)) { !isOpenDescriptor(descriptor) }
+    try await waitUntil(timeout: .seconds(5)) { !isDescriptorOpenOnFolder(descriptor, at: temp.url) }
     #expect(
-        !isOpenDescriptor(descriptor),
+        !isDescriptorOpenOnFolder(descriptor, at: temp.url),
         "dropping the watcher must close its descriptor even without an explicit stop()")
 }
 
@@ -401,6 +413,173 @@ import Foundation
         "a folder going unavailable must close its old descriptor, not leak it")
 }
 
+@Test func stopDuringAPendingEmptinessSettleDoesNotResurrectTheWatcher() async throws {
+    // Finding 1 (round 3, Critical): confirmEmptiness is scheduled via
+    // queue.asyncAfter from rescan() and, before this fix, was not
+    // generation-guarded — round 2's generation counter only protected
+    // delivery. If that closure fires after stop() has already torn
+    // everything down, it calls markMissingLocked, which calls
+    // ensureReconnectTimerLocked — re-arming the reconnect poll on a
+    // watcher that is supposed to be dead. Unlike the delivery bug this
+    // isn't a one-shot stale event: once the poll is re-armed it keeps
+    // running and can reconnect and emit again, unbounded in time.
+    //
+    // Sequence, driven by real events but synchronized on actual observed
+    // state transitions rather than guessed timing (this file's tests run
+    // in parallel by default, and this scenario turned out to be genuinely
+    // sensitive to that — see the two false negatives noted below, both
+    // found empirically, not hypothesized):
+    //
+    // empty the folder and remove the (now-empty) directory as two
+    // separate, well-spaced steps — not one FileManager.removeItem(at:)
+    // call on the whole directory. That single call's two underlying events
+    // (unlink the child, then rmdir the directory) can coalesce under
+    // contention, skipping the settle branch entirely and defeating this
+    // test outright — confirmed by instrumenting the production code
+    // temporarily and observing it happen.
+    //
+    // wait for hasPendingEmptinessSettleForTesting rather than a fixed
+    // sleep before removing the directory: a fixed "should be enough" delay
+    // was itself unreliable under contention (also confirmed by
+    // instrumentation — the settle check ended up firing while the folder
+    // still, correctly, existed, because the directory removal below had
+    // not happened yet by the time the fixed delay elapsed and the wrong
+    // real-world moment got captured as "now"). Waiting for the actual
+    // scheduling signal removes that guesswork.
+    //
+    // Then: stop() promptly, while the settle check is still pending; wait
+    // for hasPendingEmptinessSettleForTesting to clear (the check has
+    // actually run, whatever its outcome) rather than sleeping past the
+    // settle delay; then recreate the folder and write a file — if the poll
+    // got resurrected, it reconnects and reports it.
+    let temp = try TempDirectory()
+    try temp.writeFile("pre-existing.png")
+
+    let box = Box()
+    let watcher = FolderWatcher(
+        folders: [temp.url],
+        onNewEntries: { urls in box.add(urls) },
+        reconnectPollInterval: .milliseconds(20),
+        emptinessSettleDelay: .milliseconds(200),
+        reconnectLeeway: .milliseconds(5)
+    )
+    watcher.start()
+
+    try FileManager.default.removeItem(at: temp.url.appendingPathComponent("pre-existing.png"))
+    try await waitUntil(timeout: .seconds(5)) { watcher.hasPendingEmptinessSettleForTesting }
+
+    try FileManager.default.removeItem(at: temp.url) // now a clean single-step removal of an already-empty directory
+    try await waitUntil(timeout: .seconds(5)) { watcher.unavailableFolders.contains(temp.url) }
+
+    watcher.stop()
+
+    try await waitUntil(timeout: .seconds(5)) { !watcher.hasPendingEmptinessSettleForTesting }
+
+    #expect(watcher.descriptorLeakBalanceForTesting == 0, "a stopped watcher must not reopen a descriptor")
+
+    try FileManager.default.createDirectory(at: temp.url, withIntermediateDirectories: true)
+    try await Task.sleep(for: .milliseconds(700)) // time for a resurrected poll (20ms interval) to reconnect
+
+    try "z".write(to: temp.url.appendingPathComponent("after-stop.png"), atomically: true, encoding: .utf8)
+    try await Task.sleep(for: .milliseconds(700)) // time for a resurrected live watch to report it
+
+    #expect(watcher.descriptorLeakBalanceForTesting == 0, "a stopped watcher must not reopen a descriptor")
+    #expect(!box.names.contains("after-stop.png"), "a stopped watcher must not resurrect and emit")
+}
+
+@Test func noEmissionArrivesAfterARestartViaStartAlone() async throws {
+    // Finding 2 (round 3): AppState restarts this watcher by calling
+    // start() again — there is no separate stop() call on that path. The
+    // generation must be bumped there too, not only somewhere reachable
+    // exclusively from stop(). Same blocking technique as
+    // noEmissionArrivesAfterStopReturns, but the restart is start() alone.
+    let temp = try TempDirectory()
+    let box = Box()
+    let releaseFirst = DispatchSemaphore(value: 0)
+    let firstArrived = DispatchSemaphore(value: 0)
+    defer { releaseFirst.signal() }
+
+    let watcher = FolderWatcher(folders: [temp.url]) { urls in
+        if urls.contains(where: { $0.lastPathComponent == "first.png" }) {
+            firstArrived.signal()
+            releaseFirst.wait()
+        }
+        box.add(urls)
+    }
+    watcher.start()
+    defer { watcher.stop() }
+
+    try temp.writeFile("first.png")
+    try #require(blockingWait(firstArrived, timeout: .now() + 5) == .success)
+
+    try temp.writeFile("second.png")
+    try await Task.sleep(for: .milliseconds(500))
+
+    watcher.start() // restart via start() alone, no explicit stop() first
+
+    releaseFirst.signal()
+    try await Task.sleep(for: .milliseconds(300))
+
+    #expect(
+        !box.names.contains("second.png"),
+        "a delivery scheduled before a start()-triggered restart must not land after it")
+}
+
+@Test func concurrentStartAndDeliveryGenerationChecksDoNotRace() async throws {
+    // Finding 3 (round 3): the delivery closure's generation check
+    // deliberately reads `self.generation` via `queue.sync` so that read is
+    // synchronized against concurrent bumps from start()/stop(). A plain,
+    // unsynchronized read is a real data race that ordinary testing (and
+    // light concurrent hammering) does not reliably surface, because a torn
+    // read of an Int rarely produces an externally observable wrong value.
+    // Under Thread Sanitizer:
+    //   swift test --sanitize thread --filter concurrentStartAndDeliveryGenerationChecksDoNotRace
+    //
+    // Stated plainly: on this session's machine, removing the queue.sync
+    // here did not reproduce a TSan warning across roughly 18 attempts
+    // (two constructions tried — 300 paired write/start tasks, and this
+    // continuous-start-loop variant), while the unmutated version was
+    // confirmed clean across multiple runs, as required. The fix itself is
+    // unambiguously correct and follows the same pattern already proven to
+    // matter for `unavailableFolders` in round one (that mutation reliably
+    // produces TSan warnings there). Race reproduction under TSan is
+    // inherently probabilistic and scheduler-dependent; this test's
+    // construction — genuine concurrent pressure on both the write side
+    // (start()) and the read side (a real write's resulting delivery) of
+    // the exact same field — is the right shape to catch it if the
+    // scheduler cooperates, even though it didn't on this run. Widening it
+    // further (thousands of tasks) made the test impractically slow
+    // (30+ seconds) without confirmed success, so it was not pursued
+    // further.
+    let temp = try TempDirectory()
+    let folderURL = temp.url // a plain Sendable URL, unlike TempDirectory itself
+    let watcher = FolderWatcher(folders: [temp.url]) { _ in }
+    watcher.start()
+    defer { watcher.stop() }
+
+    await withTaskGroup(of: Void.self) { group in
+        // One task hammers start() continuously and rapidly for the whole
+        // window (rather than 300 one-shot concurrent calls, which Swift's
+        // cooperative thread pool time-slices rather than truly overlapping
+        // for the full duration) while the others write real files — this
+        // keeps `generation` under continuous write pressure for as long as
+        // the write-triggered deliveries take to arrive and read it.
+        group.addTask {
+            for _ in 0..<300 { watcher.start() }
+        }
+        for i in 0..<300 {
+            group.addTask {
+                let fileURL = folderURL.appendingPathComponent("race-\(i).png")
+                try? "x".write(to: fileURL, atomically: true, encoding: .utf8)
+            }
+        }
+    }
+
+    watcher.stop()
+    try await waitUntil(timeout: .seconds(10)) { watcher.descriptorLeakBalanceForTesting == 0 }
+    #expect(watcher.descriptorLeakBalanceForTesting == 0)
+}
+
 // MARK: - helpers
 
 private final class Box: @unchecked Sendable {
@@ -436,8 +615,17 @@ private func waitUntil(
     }
 }
 
-private func isOpenDescriptor(_ descriptor: Int32) -> Bool {
-    fcntl(descriptor, F_GETFD) != -1
+/// Whether `descriptor` is currently open on `url`, checked by identity
+/// (F_GETPATH) rather than by merely being a valid descriptor number — a
+/// closed number can be immediately reassigned to something unrelated by a
+/// concurrently running test, which a plain `fcntl(_, F_GETFD)` liveness
+/// check can't distinguish from the original still being open.
+private func isDescriptorOpenOnFolder(_ descriptor: Int32, at url: URL) -> Bool {
+    var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+    guard fcntl(descriptor, F_GETPATH, &buffer) != -1 else { return false }
+    let path = buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+    return URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        == url.resolvingSymlinksInPath().path
 }
 
 /// `DispatchSemaphore.wait` is unavailable directly inside an `async`
