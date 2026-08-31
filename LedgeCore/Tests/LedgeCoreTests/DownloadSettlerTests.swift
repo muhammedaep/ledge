@@ -36,12 +36,23 @@ func inProgressExtensionsAreIgnored(name: String) {
 @Test func aStableFileIsReady() async throws {
     let temp = try TempDirectory()
     let url = try temp.writeFile("report.pdf", contents: "done")
+    // A 50ms sampleInterval: a correct settle matches on its very first
+    // sample (previous seeded from the real initial read) and returns in
+    // about one interval. If that seed were instead some sentinel unrelated
+    // to the real first read, the first sample would spuriously differ and
+    // settle would only converge on the second sample, roughly twice as
+    // long — the elapsed assertion below is sized to catch exactly that.
     let settler = DownloadSettler(
-        sampleInterval: .milliseconds(20),
+        sampleInterval: .milliseconds(50),
         ceiling: .seconds(2),
         sizeProvider: { _ in 4 }
     )
-    #expect(await settler.settle(url) == .ready)
+    let start = ContinuousClock.now
+    let result = await settler.settle(url)
+    let elapsed = start.duration(to: ContinuousClock.now)
+
+    #expect(result == .ready)
+    #expect(elapsed < .milliseconds(80), "a file that never changes must settle on the first sample, not the second")
 }
 
 @Test func fileSizeReflectsGrowthAsTheFileIsWrittenTo() throws {
@@ -58,6 +69,18 @@ func inProgressExtensionsAreIgnored(name: String) {
 
     #expect(before == 1)
     #expect(after == 500)
+}
+
+@Test func fileSizeSentinelForAMissingPathIsNegativeOne() throws {
+    // No settle() codepath currently calls fileSize a second time on a path
+    // that has already vanished — both the top-level and in-loop fileExists
+    // guards intercept first — so this sentinel value is otherwise untested
+    // by anything else in this file. A direct assertion, not an elapsed-time
+    // one, since there is no "slower vs faster" behavior to time here: the
+    // fallback is either right or silently wrong.
+    let temp = try TempDirectory()
+    let url = temp.url.appendingPathComponent("never-written.bin")
+    #expect(DownloadSettler.fileSize(url) == -1)
 }
 
 @Test func aGrowingFileIsNotReadyUntilItStops() async throws {
@@ -159,6 +182,48 @@ func inProgressExtensionsAreIgnored(name: String) {
     #expect(counter.callCount < 100, "a cancelled settle should not keep sampling after cancellation")
 }
 
+@Test func aContendedFileIsReportedStillWritingNotReady() async throws {
+    let temp = try TempDirectory()
+    let url = try temp.writeFile("contended.bin", contents: "done")
+
+    // Hold a real writing claim on a dedicated OS thread, simulating another
+    // app (or iCloud) actively writing this same file — a coordinated read
+    // against an active write claim does not fail fast, it waits for the
+    // claim to be released (confirmed by direct experiment), so this is the
+    // only way to exercise canReadWithoutContention's false path for real.
+    // NSFileCoordinator predates Sendable; cancelling/signaling it across
+    // threads is exactly its documented purpose.
+    nonisolated(unsafe) let writerCoordinator = NSFileCoordinator()
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        let writerThread = Thread {
+            var error: NSError?
+            writerCoordinator.coordinate(writingItemAt: url, options: [], error: &error) { _ in
+                continuation.resume()
+                Thread.sleep(forTimeInterval: 1.0)
+            }
+        }
+        writerThread.start()
+    }
+
+    // A constant size, so the settler reaches its first stability check (and
+    // so canReadWithoutContention) almost immediately, well before the write
+    // claim above is released.
+    let settler = DownloadSettler(sampleInterval: .milliseconds(20), ceiling: .seconds(5))
+    let settling = Task { await settler.settle(url) }
+    try await Task.sleep(for: .milliseconds(60))
+
+    // Cancel while settle() must be blocked waiting on the contended read.
+    // Without withTaskCancellationHandler cancelling the coordinator too,
+    // this would wait out the full write claim instead of returning promptly.
+    let start = ContinuousClock.now
+    settling.cancel()
+    let result = await settling.value
+    let elapsed = start.duration(to: ContinuousClock.now)
+
+    #expect(result == .stillWriting, "contention must not be reported as ready, whether resolved or cut short by cancellation")
+    #expect(elapsed < .milliseconds(500), "a cancelled contended read must not wait out the other claim")
+}
+
 @Test func aFileDeletedDuringSettlingIsIgnoredNotReady() async throws {
     let temp = try TempDirectory()
     let url = try temp.writeFile("vanishing.bin", contents: "0")
@@ -183,6 +248,18 @@ func inProgressExtensionsAreIgnored(name: String) {
 @Test func aVanishedFileIsIgnored() async throws {
     let temp = try TempDirectory()
     let url = temp.url.appendingPathComponent("never-existed.pdf")
-    let settler = DownloadSettler(sampleInterval: .milliseconds(10), ceiling: .seconds(1))
-    #expect(await settler.settle(url) == .ignored)
+    // A 100ms sampleInterval, well above the immediate-return floor below: a
+    // file that never existed must be caught by the top-level fileExists
+    // guard before ever entering the sampling loop. If that guard were
+    // dropped, the in-loop guard would still eventually catch it, but only
+    // after one full sampleInterval — the elapsed assertion distinguishes
+    // "caught immediately" from "caught one sample late."
+    let settler = DownloadSettler(sampleInterval: .milliseconds(100), ceiling: .seconds(1))
+
+    let start = ContinuousClock.now
+    let result = await settler.settle(url)
+    let elapsed = start.duration(to: ContinuousClock.now)
+
+    #expect(result == .ignored)
+    #expect(elapsed < .milliseconds(50), "a file that never existed must be caught before the sampling loop, not inside it")
 }

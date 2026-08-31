@@ -11,8 +11,8 @@ public enum SettleResult: Equatable, Sendable {
     case gaveUp
     /// The settle was cancelled before reaching a conclusion — the app quit,
     /// or the watcher restarted because the user changed a watched folder.
-    /// Unlike the other three terminal cases this says nothing about the
-    /// file itself; the caller should re-queue it once running again.
+    /// Unlike the other four cases this says nothing about the file itself;
+    /// the caller should re-queue it once running again.
     case cancelled
 }
 
@@ -105,22 +105,40 @@ public struct DownloadSettler: Sendable {
     /// timeout fires first, (b) has no way to propagate this call's priority to
     /// that background work, and (c) required a `var succeeded` mutated from
     /// inside the coordinator's callback, which is a data race the compiler
-    /// already flagged. The async form has none of these problems and always
-    /// eventually calls back.
+    /// already flagged.
+    ///
+    /// A pending coordinated read waits for a conflicting claim to be released
+    /// rather than failing fast — measured directly against a real writer
+    /// holding a write claim, the read's completion handler simply doesn't
+    /// fire until the writer does. Left alone, that means this call is
+    /// unbounded: it does not return until either read succeeds or `deadline`
+    /// forces the caller to give up on the *whole* settle, however long that
+    /// coordinated wait takes. `withTaskCancellationHandler` makes it respect
+    /// cancellation specifically: calling `coordinator.cancel()` interrupts a
+    /// pending (not-yet-granted) request and fails it promptly, so a cancelled
+    /// settle returns promptly here too instead of waiting out someone else's
+    /// claim.
     ///
     /// `error` from the accessor is deliberately not surfaced: any coordination
-    /// failure — including another process not responding — is treated the
-    /// same as unresolved contention. Better to wait for one more sample than
-    /// to file a document another app might still be writing to.
+    /// failure — including cancellation, or another process not responding —
+    /// is treated the same as unresolved contention. Better to wait for one
+    /// more sample than to file a document another app might still be writing to.
     private static func canReadWithoutContention(_ url: URL) async -> Bool {
         let intent = NSFileAccessIntent.readingIntent(with: url, options: .withoutChanges)
-        let coordinator = NSFileCoordinator()
+        // NSFileCoordinator predates Sendable and isn't annotated, but calling
+        // `cancel()` from a different thread than the one that started the
+        // coordinated access is exactly its documented cross-thread purpose.
+        nonisolated(unsafe) let coordinator = NSFileCoordinator()
         let queue = OperationQueue()
 
-        return await withCheckedContinuation { continuation in
-            coordinator.coordinate(with: [intent], queue: queue) { error in
-                continuation.resume(returning: error == nil)
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                coordinator.coordinate(with: [intent], queue: queue) { error in
+                    continuation.resume(returning: error == nil)
+                }
             }
+        } onCancel: {
+            coordinator.cancel()
         }
     }
 }
