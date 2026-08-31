@@ -15,6 +15,8 @@
 		A1B2C3D400114455AA660009 /* ShelfRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660008 /* ShelfRow.swift */; };
 		A1B2C3D400114455AA66000B /* OrganizeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66000A /* OrganizeSheet.swift */; };
 		A1B2C3D400114455AA66000D /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66000C /* SettingsView.swift */; };
+		A1B2C3D400114455AA660011 /* GeneralPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660010 /* GeneralPane.swift */; };
+		A1B2C3D400114455AA660013 /* PermissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660012 /* PermissionView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +28,8 @@
 		A1B2C3D400114455AA660008 /* ShelfRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfRow.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA66000A /* OrganizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizeSheet.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA66000C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A1B2C3D400114455AA660010 /* GeneralPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralPane.swift; sourceTree = "<group>"; };
+		A1B2C3D400114455AA660012 /* PermissionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,6 +60,7 @@
 				A1B2C3D400114455AA660001 /* Preferences.swift */,
 				19C7F09942DB4C26BB9C6052 /* Shelf */,
 				A1B2C3D400114455AA66000E /* Organize */,
+				A1B2C3D400114455AA660014 /* Onboarding */,
 				A1B2C3D400114455AA66000F /* Settings */,
 			);
 			path = Ledge;
@@ -78,10 +83,19 @@
 			path = Organize;
 			sourceTree = "<group>";
 		};
+		A1B2C3D400114455AA660014 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D400114455AA660012 /* PermissionView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
 		A1B2C3D400114455AA66000F /* Settings */ = {
 			isa = PBXGroup;
 			children = (
 				A1B2C3D400114455AA66000C /* SettingsView.swift */,
+				A1B2C3D400114455AA660010 /* GeneralPane.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -175,6 +189,8 @@
 				A1B2C3D400114455AA660009 /* ShelfRow.swift in Sources */,
 				A1B2C3D400114455AA66000B /* OrganizeSheet.swift in Sources */,
 				A1B2C3D400114455AA66000D /* SettingsView.swift in Sources */,
+				A1B2C3D400114455AA660011 /* GeneralPane.swift in Sources */,
+				A1B2C3D400114455AA660013 /* PermissionView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -321,7 +337,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ledge.Ledge;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
@@ -347,7 +363,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ledge.Ledge;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
 		};

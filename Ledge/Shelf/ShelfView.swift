@@ -9,6 +9,17 @@ struct ShelfView: View {
     @State private var showingOrganize = false
 
     var body: some View {
+        // A watched folder Ledge cannot read means nothing will ever be filed,
+        // so the shelf would be a permanently empty list with no explanation.
+        // The reason takes its place until access is granted.
+        if state.hasFolderAccess {
+            shelf
+        } else {
+            PermissionView()
+        }
+    }
+
+    private var shelf: some View {
         VStack(alignment: .leading, spacing: 0) {
             destinationHeader
 

@@ -1,11 +1,10 @@
 import SwiftUI
 
-/// Placeholder settings scene. It exists so the shelf's `SettingsLink` has a
-/// scene to open; its tabs are filled in by later tasks.
+/// The settings scene the shelf's `SettingsLink` opens. Rules fill in later.
 struct SettingsView: View {
     var body: some View {
         TabView {
-            Text("General")
+            GeneralPane()
                 .tabItem { Label("General", systemImage: "gearshape") }
             Text("Rules")
                 .tabItem { Label("Rules", systemImage: "list.bullet") }
