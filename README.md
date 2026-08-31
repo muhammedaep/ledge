@@ -163,6 +163,16 @@ the compiler's own extraction rather than grepping the sources, which is what
 lets it see `.help()` tooltips, hidden `Picker` labels and bare
 `Text("\(count)")`.
 
+It also enforces one architectural rule: **user-facing sentences belong in the
+app target, not in `LedgeCore`.** The package has no string catalog, so a
+sentence written there cannot be translated at all. Core types carry the values
+and the app target composes the wording around them — `RuleSet.Unusable` carries
+the offending names, `AppState` supplies the sentence. `make strings` fails if
+`String(localized:)`, `NSLocalizedString`, `LocalizedError` or the other
+localization APIs appear under `LedgeCore/Sources/`. It is not a rule against
+string literals there; the package is full of legitimate ones — filenames, JSON
+keys, category names.
+
 **No third-party dependencies.** Not in the app, not in the package, not in CI.
 
 The project is split in two. `LedgeCore` is a dependency-free Swift package

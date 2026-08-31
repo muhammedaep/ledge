@@ -8,6 +8,7 @@ STAGE    := $(BUILD)/dmg
 DMG      := $(BUILD)/$(APP).dmg
 DERIVED  := $(BUILD)/derived
 CATALOG  := Ledge/Resources/Localizable.xcstrings
+CORE_SRC := LedgeCore/Sources
 LANGUAGE := tr
 
 # Signing and notarization need two things set in the environment. Neither is
@@ -60,13 +61,18 @@ build:
 		-derivedDataPath $(DERIVED) -quiet \
 		CODE_SIGNING_ALLOWED=NO
 
-# Catches the gap xcodebuild leaves: it does not write newly discovered keys
-# back into the source .xcstrings the way Xcode's GUI does, so a new Text("…")
-# renders in English under $(LANGUAGE) forever with nothing reporting it.
+# Two checks, reported separately so a failure says which problem it is.
 #
-# Depends on build because the check reads what the compiler extracted
-# (SWIFT_EMIT_LOC_STRINGS), not a grep over the sources — a grep misses
-# .help() tooltips, hidden Picker labels, and bare Text("\(count)").
+# 1. Catalog coverage. xcodebuild does not write newly discovered keys back
+#    into the source .xcstrings the way Xcode's GUI does, so a new Text("…")
+#    renders in English under $(LANGUAGE) forever with nothing reporting it.
+#    Depends on build because it reads what the compiler extracted
+#    (SWIFT_EMIT_LOC_STRINGS) rather than grepping the sources — a grep misses
+#    .help() tooltips, hidden Picker labels, and bare Text("\(count)").
+#
+# 2. No localization APIs in $(CORE_SRC). LedgeCore is a separate package with
+#    no catalog, so a sentence written there cannot be translated at all. Core
+#    carries the values; the app target composes the wording.
 strings: build
 	@command -v python3 >/dev/null 2>&1 || { \
 		echo "make strings needs python3, which is not on PATH."; \
@@ -75,6 +81,7 @@ strings: build
 	@python3 Scripts/check-strings.py \
 		--stringsdata-root $(DERIVED) \
 		--catalog $(CATALOG) \
+		--core-sources $(CORE_SRC) \
 		--language $(LANGUAGE)
 
 clean:
