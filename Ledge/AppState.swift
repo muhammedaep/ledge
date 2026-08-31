@@ -278,4 +278,13 @@ final class AppState {
         let all = await filing.records
         recentRecords = Array(all.prefix(preferences.shelfSize))
     }
+
+    // MARK: - Errors
+
+    /// Dismisses the last failure. `lastError` is otherwise write-only from
+    /// outside this class, and the shelf needs to be able to put the banner
+    /// away once the user has read it.
+    func clearError() {
+        lastError = nil
+    }
 }
