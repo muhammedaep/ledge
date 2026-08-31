@@ -73,6 +73,61 @@ import Foundation
     #expect(names.isEmpty)
 }
 
+/// Thread-safe accumulator for results reported concurrently from
+/// `DispatchQueue.concurrentPerform`, used only by the race test below.
+private final class ConcurrentResults: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [Result<URL, Error>] = []
+
+    func record(_ value: Result<URL, Error>) {
+        lock.lock()
+        values.append(value)
+        lock.unlock()
+    }
+
+    func snapshot() -> [Result<URL, Error>] {
+        lock.lock()
+        defer { lock.unlock() }
+        return values
+    }
+}
+
+@Test func concurrentMovesToTheSameNameAllSucceedInsteadOfThrowing() throws {
+    let temp = try TempDirectory()
+    let dest = try temp.makeDirectory("Images")
+    let mover = FileMover()
+    let count = 8
+
+    // Distinct source files that all happen to be named "a.png", so every
+    // concurrent mover races `availableURL`/`moveItem` over the same
+    // destination name — this is the folder watcher and Organize Now
+    // colliding on the same download in practice.
+    let sources = try (0..<count).map { try temp.writeFile("src\($0)/a.png") }
+
+    let results = ConcurrentResults()
+    DispatchQueue.concurrentPerform(iterations: count) { index in
+        do {
+            let final = try mover.move(sources[index], into: dest)
+            results.record(.success(final))
+        } catch {
+            results.record(.failure(error))
+        }
+    }
+
+    let outcomes = results.snapshot()
+    let failures = outcomes.compactMap { outcome -> Error? in
+        if case .failure(let error) = outcome { return error }
+        return nil
+    }
+    #expect(failures.isEmpty, "a lost collision race must retry, not throw: \(failures)")
+
+    // Every mover landed on a distinct, correctly-numbered name — no file
+    // was clobbered and none was silently dropped.
+    let names = try FileManager.default.contentsOfDirectory(atPath: dest.path).sorted()
+    let expected = (["a.png"] + (1..<count).map { "a (\($0)).png" }).sorted()
+    #expect(names == expected)
+}
+
 @Test func movesADirectoryAsASingleUnit() throws {
     let temp = try TempDirectory()
     let project = try temp.makeDirectory("Project.app")
