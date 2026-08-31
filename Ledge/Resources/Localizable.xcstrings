@@ -994,20 +994,16 @@
       }
     },
     "Other": {
+      "comment": "Do not translate. The TextField placeholder for the fallback category's name, and the literal name of the folder RuleSet.defaults files into. The on-disk name is deliberately not localized — translating it would orphan every file already filed under the old name the moment the system language changed — so the placeholder has to name the folder that actually exists.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Other"
           }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Diğer"
-          }
         }
-      }
+      },
+      "shouldTranslate": false
     },
     "Permission…": {
       "localizations": {

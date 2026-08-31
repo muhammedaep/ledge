@@ -50,8 +50,32 @@ struct PermissionView: View {
 
     private var blockedFolders: [URL] { state.unreadableFolders }
 
+    /// What to call the blocked folder inside the headline sentence.
+    ///
+    /// `localizedName`, not `lastPathComponent`, because this name is dropped
+    /// into a translated sentence. The on-disk name of the folder this screen
+    /// exists for is literally `Downloads`, so a Turkish user would otherwise
+    /// read "Ledge, Downloads klasörünü okuyamıyor" — an English folder name in
+    /// a Turkish sentence — while the fallback below said `İndirilenler`, so the
+    /// same sentence named the folder two different ways depending on a branch
+    /// the user cannot see. macOS localizes the home folders through the
+    /// `.localized` marker each one carries, so this is also the name Finder is
+    /// showing for it in the window behind this one.
+    ///
+    /// Falls back to the real name when a folder has no localization, which is
+    /// every folder the user adds themselves.
+    ///
+    /// The read is safe to do here, on the main actor, for the reason the rest
+    /// of this app moves filesystem work off it: that rule exists because a
+    /// record can point at an unmounted volume, where a read blocks for the
+    /// mount timeout. This view renders only for `unreadableFolders` — folders
+    /// that are present and refuse to be read. A folder that is merely gone is
+    /// classified `.missing` by the sweep that ran moments ago and gets the
+    /// shelf's banner instead, never this screen.
     private var folderName: String {
-        blockedFolders.first?.lastPathComponent ?? String(localized: "Downloads")
+        guard let folder = blockedFolders.first else { return String(localized: "Downloads") }
+        let localized = try? folder.resourceValues(forKeys: [.localizedNameKey]).localizedName
+        return localized ?? folder.lastPathComponent
     }
 
     private func openPrivacySettings() {
