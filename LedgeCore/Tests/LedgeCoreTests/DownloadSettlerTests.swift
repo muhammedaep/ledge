@@ -26,7 +26,11 @@ func inProgressExtensionsAreIgnored(name: String) {
 @Test func aStableFileIsReady() async throws {
     let temp = try TempDirectory()
     let url = try temp.writeFile("report.pdf", contents: "done")
-    let settler = DownloadSettler(sampleInterval: .milliseconds(20), ceiling: .seconds(2))
+    let settler = DownloadSettler(
+        sampleInterval: .milliseconds(20),
+        ceiling: .seconds(2),
+        sizeProvider: { _ in 4 }
+    )
     #expect(await settler.settle(url) == .ready)
 }
 
@@ -52,28 +56,26 @@ func inProgressExtensionsAreIgnored(name: String) {
     let temp = try TempDirectory()
     let url = try temp.writeFile("endless.bin", contents: "0")
 
-    // Writes continuously on its own OS thread, off Swift's cooperative
-    // executor, so it can't be starved by the other tests running concurrently
-    // on that shared pool while this test is timing the settler's polling loop.
-    final class StopFlag: @unchecked Sendable {
+    // A size that is always different from the last reading — no writer
+    // thread and no timing race against the settler's own sampling clock,
+    // so this is deterministic on every machine.
+    final class IncreasingCounter: @unchecked Sendable {
         private let lock = NSLock()
-        private var stopped = false
-        func stop() { lock.lock(); stopped = true; lock.unlock() }
-        var isStopped: Bool { lock.lock(); defer { lock.unlock() }; return stopped }
-    }
-    let stopFlag = StopFlag()
-    let writerThread = Thread {
-        var i = 0
-        while !stopFlag.isStopped {
-            i += 1
-            try? String(repeating: "x", count: i * 100).write(to: url, atomically: false, encoding: .utf8)
+        private var value: Int64 = 0
+        func next() -> Int64 {
+            lock.lock(); defer { lock.unlock() }
+            value += 1
+            return value
         }
     }
-    writerThread.start()
+    let counter = IncreasingCounter()
 
-    let settler = DownloadSettler(sampleInterval: .milliseconds(5), ceiling: .milliseconds(120))
+    let settler = DownloadSettler(
+        sampleInterval: .milliseconds(5),
+        ceiling: .milliseconds(120),
+        sizeProvider: { _ in counter.next() }
+    )
     let result = await settler.settle(url)
-    stopFlag.stop()
 
     #expect(result == .gaveUp)
 }

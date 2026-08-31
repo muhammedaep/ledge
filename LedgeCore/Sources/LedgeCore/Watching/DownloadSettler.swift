@@ -25,10 +25,16 @@ public struct DownloadSettler: Sendable {
 
     private let sampleInterval: Duration
     private let ceiling: Duration
+    private let sizeProvider: @Sendable (URL) -> Int64
 
-    public init(sampleInterval: Duration = .seconds(2), ceiling: Duration = .seconds(300)) {
+    public init(
+        sampleInterval: Duration = .seconds(2),
+        ceiling: Duration = .seconds(300),
+        sizeProvider: @escaping @Sendable (URL) -> Int64 = DownloadSettler.fileSize
+    ) {
         self.sampleInterval = sampleInterval
         self.ceiling = ceiling
+        self.sizeProvider = sizeProvider
     }
 
     public static func isIgnored(_ url: URL) -> Bool {
@@ -43,13 +49,13 @@ public struct DownloadSettler: Sendable {
         else { return .ignored }
 
         let deadline = ContinuousClock.now.advanced(by: ceiling)
-        var previous = Self.size(of: url)
+        var previous = sizeProvider(url)
 
         while ContinuousClock.now < deadline {
             try? await Task.sleep(for: sampleInterval)
 
             guard FileManager.default.fileExists(atPath: url.path) else { return .ignored }
-            let current = Self.size(of: url)
+            let current = sizeProvider(url)
 
             if current == previous {
                 return Self.canReadWithoutContention(url) ? .ready : .stillWriting
@@ -67,7 +73,7 @@ public struct DownloadSettler: Sendable {
     /// polling loop makes) would keep returning the size from the very first
     /// sample forever, never seeing the file grow. `attributesOfItem` always
     /// re-stats the file.
-    private static func size(of url: URL) -> Int64 {
+    public static func fileSize(_ url: URL) -> Int64 {
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
         return (attributes?[.size] as? NSNumber)?.int64Value ?? -1
     }
