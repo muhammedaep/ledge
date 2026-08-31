@@ -275,6 +275,37 @@ func aCancelledSettleReturnsPromptlyInsteadOfSpinning() async throws {
     #expect(counter.callCount < 100, "a cancelled settle should not keep sampling after cancellation")
 }
 
+/// A one-shot signal that synchronous code can raise and an async test can
+/// await, without blocking a cooperative thread on a semaphore.
+private final class Signal: @unchecked Sendable {
+    private let lock = NSLock()
+    private var raised = false
+    private var waiter: CheckedContinuation<Void, Never>?
+
+    func raise() {
+        lock.lock()
+        guard !raised else { lock.unlock(); return }
+        raised = true
+        let waiting = waiter
+        waiter = nil
+        lock.unlock()
+        waiting?.resume()
+    }
+
+    func wait() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            lock.lock()
+            if raised {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                waiter = continuation
+                lock.unlock()
+            }
+        }
+    }
+}
+
 @Test(.timeLimit(.minutes(1)))
 func aContendedFileIsReportedStillWritingNotReady() async throws {
     let temp = try TempDirectory()
@@ -287,35 +318,71 @@ func aContendedFileIsReportedStillWritingNotReady() async throws {
     // only way to exercise canReadWithoutContention's false path for real.
     // NSFileCoordinator predates Sendable; cancelling/signaling it across
     // threads is exactly its documented purpose.
+    //
+    // The claim is held until this test releases it, with a 2s backstop. That
+    // number is load-bearing in one direction only and must not be raised: the
+    // implementation this test replaced waited on a semaphore with a *3 second*
+    // timeout and ignored cancellation entirely, so the claim has to fall away
+    // before that timeout for the difference to show up in the result. It is
+    // not a deadline the correct implementation ever approaches — it returns in
+    // tens of milliseconds.
+    let claimHeld = Latch()
+    let releaseWriter = DispatchSemaphore(value: 0)
     nonisolated(unsafe) let writerCoordinator = NSFileCoordinator()
     await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
         let writerThread = Thread {
             var error: NSError?
             writerCoordinator.coordinate(writingItemAt: url, options: [], error: &error) { _ in
                 continuation.resume()
-                Thread.sleep(forTimeInterval: 1.0)
+                _ = releaseWriter.wait(timeout: .now() + 2.0)
+                claimHeld.lower()
             }
         }
         writerThread.start()
     }
+    defer { releaseWriter.signal() }
 
-    // A constant size, so the settler reaches its first stability check (and
-    // so canReadWithoutContention) almost immediately, well before the write
-    // claim above is released.
-    let settler = DownloadSettler(sampleInterval: .milliseconds(20), ceiling: .seconds(5))
+    // THE SYNCHRONISATION — please do not turn this back into a sleep.
+    //
+    // This test must cancel the settle *after* it has committed to the
+    // coordinated read. Waiting a fixed 60ms for that was wrong, and failed
+    // about one full-suite run in ten: under load the cancel landed while the
+    // settler was still in its sampling loop, where `Task.isCancelled` quite
+    // correctly returns .cancelled, and the test blamed the code.
+    //
+    // The injected sizeProvider is the fact we need. `settle` reads the size
+    // once to seed `previous`, then once per sample; the second read is the one
+    // compared against the seed, and because the sizes match, the very next
+    // thing it does is enter canReadWithoutContention. Crucially there is no
+    // `Task.isCancelled` check between that read and the coordinated read, so
+    // once the second read has happened `.cancelled` is off the table and the
+    // outcome can only be .ready or .stillWriting. Waiting for that read is
+    // therefore exact, and immune to how loaded the machine is.
+    let committedToCoordinatedRead = Signal()
+    let reads = SizeReads(returning: 4)
+    let settler = DownloadSettler(
+        sampleInterval: .milliseconds(20),
+        ceiling: .seconds(30),
+        sizeProvider: { url in
+            let size = reads.read(url)
+            if reads.callCount == 2 { committedToCoordinatedRead.raise() }
+            return size
+        }
+    )
+
     let settling = Task { await settler.settle(url) }
-    try await Task.sleep(for: .milliseconds(60))
-
-    // Cancel while settle() must be blocked waiting on the contended read.
-    // Without withTaskCancellationHandler cancelling the coordinator too,
-    // this would wait out the full write claim instead of returning promptly.
-    let start = ContinuousClock.now
+    await committedToCoordinatedRead.wait()
     settling.cancel()
     let result = await settling.value
-    let elapsed = start.duration(to: ContinuousClock.now)
 
-    #expect(result == .stillWriting, "contention must not be reported as ready, whether resolved or cut short by cancellation")
-    #expect(elapsed < .milliseconds(500), "a cancelled contended read must not wait out the other claim")
+    #expect(result == .stillWriting,
+            "contention must not be reported as ready, whether resolved or cut short by cancellation")
+    // The second assertion is an ordering fact rather than a stopwatch reading:
+    // a cancelled coordinated read must come back while the other claim is
+    // still held. An implementation that cannot be cancelled comes back only
+    // once the writer has let go, by which point this latch is down.
+    #expect(claimHeld.isRaised,
+            "a cancelled contended read must not wait out the other claim")
 }
 
 @Test func aFileDeletedDuringSettlingIsIgnoredNotReady() async throws {
