@@ -50,12 +50,17 @@ jobs:
         run: swift test
 
       # Only proves the SwiftUI layer still compiles; every behavioural
-      # assertion lives in the step above.
+      # assertion lives in the step above. Via `make` rather than a second copy
+      # of the xcodebuild line, so the two cannot drift — and because the
+      # localization step below reads the .stringsdata this build emits into
+      # build/derived.
       - name: Build the app
-        run: |
-          xcodebuild build \
-            -project Ledge.xcodeproj \
-            -scheme Ledge \
-            -configuration Release \
-            -destination 'platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO
+        run: make build
+
+      # xcodebuild does not write newly discovered keys back into the source
+      # .xcstrings the way Xcode's GUI does, so a new Text("…") would render in
+      # English under tr with nothing anywhere reporting it. This reports it on
+      # the pull request, rather than leaving it to be noticed in a shipped
+      # build. The build above is incremental here, not repeated.
+      - name: Check localization coverage
+        run: make strings

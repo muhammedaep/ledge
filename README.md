@@ -149,8 +149,19 @@ There is a `Makefile` for the same things:
 ```
 make test     # cd LedgeCore && swift test
 make build    # compile the app, unsigned
+make strings  # check every UI string is in the Turkish catalog
 make help     # everything else, including the release targets
 ```
+
+**If you add or change UI text, run `make strings`.** The interface is localized
+into Turkish, and `xcodebuild` — unlike Xcode's GUI — does not write newly
+discovered keys back into `Ledge/Resources/Localizable.xcstrings`. Without that
+check a new `Text("…")` renders in English under Turkish forever and nothing
+says so. It compares what the compiler actually extracted against the catalog
+and fails on anything missing, so CI catches it on the pull request. It reads
+the compiler's own extraction rather than grepping the sources, which is what
+lets it see `.help()` tooltips, hidden `Picker` labels and bare
+`Text("\(count)")`.
 
 **No third-party dependencies.** Not in the app, not in the package, not in CI.
 
