@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Direct distribution outside the App Store: a Developer ID signature
+         that Gatekeeper accepts once the DMG has been notarized and stapled. -->
+    <key>method</key>
+    <string>developer-id</string>
+
+    <key>signingStyle</key>
+    <string>automatic</string>
+
+    <!-- Hardened runtime is a notarization requirement. The project already
+         sets ENABLE_HARDENED_RUNTIME, and this keeps the export from quietly
+         dropping it. -->
+    <key>destination</key>
+    <string>export</string>
+
+    <!-- No teamID key on purpose: with a single team, xcodebuild infers it
+         from the archive, and `make archive` passes DEVELOPMENT_TEAM anyway.
+         If you belong to more than one Apple Developer team, add:
+             <key>teamID</key><string>YOURTEAMID</string>
+         or export will fail with an ambiguous-team error. -->
+</dict>
+</plist>

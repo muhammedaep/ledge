@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A second push to the same branch supersedes the first; don't burn a macOS
+# runner finishing a run nobody will read.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test and build
+    # macos-15, pinned deliberately rather than macos-latest:
+    #   - macos-latest moved to macos-26 over June-July 2026 and will move
+    #     again, so it silently changes the toolchain under this project.
+    #   - macos-14 began deprecation on 2026-07-06 and is unsupported from
+    #     2026-11-02, so it is not an option either.
+    # macos-15 ships Xcode 16.4 as its default (Swift 6.1), which is what
+    # LedgeCore's swift-tools-version 6.0 and the app's Swift 6 language mode
+    # need. Development happens on a newer Xcode, so this job doubles as the
+    # check that the project still builds on the oldest toolchain it claims.
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Printed, not asserted: when a green run turns red after an image
+      # update, this is the line that says why.
+      - name: Toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # LedgeCore holds every decision the app makes and runs headlessly.
+      # `swift test` exits non-zero on a real failure. It exits zero on the
+      # one deliberate `withKnownIssue` in FolderWatcherTests, and also fails
+      # if that known issue ever stops occurring — both are intended; do not
+      # add `|| true` or a retry here.
+      - name: Test LedgeCore
+        working-directory: LedgeCore
+        run: swift test
+
+      # Only proves the SwiftUI layer still compiles; every behavioural
+      # assertion lives in the step above.
+      - name: Build the app
+        run: |
+          xcodebuild build \
+            -project Ledge.xcodeproj \
+            -scheme Ledge \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO
