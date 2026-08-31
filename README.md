@@ -82,8 +82,12 @@ the Trash, or resynced by iCloud or Dropbox) it is still individually undoable.
 
 ## Requirements
 
-macOS 14.0 (Sonoma) or later. `make dmg` produces a universal build — Apple
-Silicon and Intel.
+macOS 14.0 (Sonoma) or later.
+
+`make build` and CI produce a binary for the architecture of the machine that
+built it. `make archive` is intended to produce a universal build — Apple
+Silicon and Intel — but it has not been run yet, so treat that as unverified
+until someone cuts the first release and checks it.
 
 Ledge lives only in the menu bar; there is no Dock icon and no main window.
 
@@ -166,8 +170,8 @@ tests were checked that way, which ones did not discriminate, and what was done
 about them — including one guard that passed with the exact bug it was guarding
 against restored. New tests for core behaviour are expected to meet the same bar.
 
-`.github/workflows/ci.yml` runs the suite and builds the app on every push and
-pull request.
+`.github/workflows/ci.yml` runs the suite and builds the app on every pull
+request and every push to `main`.
 
 ## License
 
