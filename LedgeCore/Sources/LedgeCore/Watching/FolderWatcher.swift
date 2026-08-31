@@ -22,11 +22,21 @@ import Foundation
 /// reconnect timer) already runs on it because it was created with `queue:` as
 /// its target.
 ///
-/// `onNewEntries` is dispatched to a queue other than `queue` (see
-/// `commitLocked`) so a caller's callback is never re-entrant with respect to
-/// this watcher's own internal state — a callback that turns around and calls
-/// `stop()` or reads `unavailableFolders` must not deadlock against the very
-/// call that is invoking it.
+/// `onNewEntries` is delivered on `deliveryQueue`, a dedicated serial queue
+/// that is neither `queue` nor the global concurrent pool (see
+/// `commitLocked`): off `queue` so a caller's callback is never re-entrant
+/// with respect to this watcher's own internal state — a callback that turns
+/// around and calls `stop()` or reads `unavailableFolders` must not deadlock
+/// against the very call that is invoking it — and serial rather than
+/// concurrent so deliveries stay FIFO-ordered with no two callbacks
+/// overlapping and no thread-pool growth under a burst. Moving delivery off
+/// `queue` also opened a lifecycle hole on its own: a delivery already
+/// scheduled when `stop()` is called could otherwise still land afterwards —
+/// mid-restart, or after teardown. `generation` closes that hole: it is
+/// bumped every time `stopLocked` runs (both `start()` and `stop()` go
+/// through it), captured when a delivery is scheduled, and re-checked when
+/// that delivery actually runs; a delivery whose generation has since moved
+/// on is dropped instead of delivered.
 public final class FolderWatcher: @unchecked Sendable {
     private struct Watch {
         let descriptor: Int32
@@ -39,6 +49,7 @@ public final class FolderWatcher: @unchecked Sendable {
     private let reconnectLeeway: DispatchTimeInterval
     private let emptinessSettleDelay: DispatchTimeInterval
     private let queue = DispatchQueue(label: "com.ledge.folder-watcher")
+    private let deliveryQueue = DispatchQueue(label: "com.ledge.folder-watcher.delivery")
 
     // Confined to `queue` — see the type doc above.
     private var watches: [URL: Watch] = [:]
@@ -47,6 +58,7 @@ public final class FolderWatcher: @unchecked Sendable {
     private var reconnectTimer: DispatchSourceTimer?
     private var _descriptorsOpened = 0
     private var _descriptorsClosed = 0
+    private var generation = 0
 
     /// Folders currently unwatched because they don't exist (never existed, were
     /// deleted, or their volume unmounted). Safe to read from any thread.
@@ -67,13 +79,25 @@ public final class FolderWatcher: @unchecked Sendable {
     }
 
     /// `reconnectPollInterval` controls how often a missing folder is checked
-    /// for reappearance, `emptinessSettleDelay` how long an abrupt "everything
-    /// is gone" reading is held before being trusted (see `rescan`), and
-    /// `reconnectLeeway` how much slack the system may take when firing the
-    /// reconnect poll (battery/power efficiency — irrelevant to correctness).
-    /// All three exist only so tests can make these cadences fast without
+    /// for reappearance, and `emptinessSettleDelay` how long an abrupt
+    /// "everything is gone" reading is held before being trusted (see
+    /// `rescan`). `reconnectLeeway` gives Dispatch slack on the *first*
+    /// deadline of the repeating reconnect timer only — measured directly: a
+    /// 500ms-repeating timer with 5s of leeway still fires every 500ms, since
+    /// Dispatch clamps leeway on a repeating timer to its initial fire and
+    /// applies none to the recurring ones after that. It is not a meaningful
+    /// battery lever on its own; the actual battery win is entirely
+    /// `ensureReconnectTimerLocked`/`stopReconnectTimerLockedIfIdle` gating
+    /// the timer to run only while a folder is actually missing, which is
+    /// the rare, transient case rather than the steady state. All three
+    /// parameters exist so tests can make these cadences fast without
     /// depending on production timing; the public initializer above always
-    /// uses the production defaults.
+    /// uses the production defaults, keeping `reconnectPollInterval` at
+    /// 500ms rather than raising it further — the timer already costs
+    /// nothing while everything is fine, and 500ms keeps reconnection
+    /// prompt for the case that matters: a user who just reconnected a
+    /// drive and expects Ledge to notice quickly, not after several
+    /// seconds.
     init(
         folders: [URL],
         onNewEntries: @escaping @Sendable (Set<URL>) -> Void,
@@ -165,6 +189,11 @@ public final class FolderWatcher: @unchecked Sendable {
     }
 
     private func stopLocked() {
+        // Bumped here, not separately in start()/stop(), because both always
+        // go through this: start() calls it to reset before reattaching,
+        // stop() calls it directly. Any delivery scheduled against the
+        // generation that existed before this call is now stale.
+        generation += 1
         watches.values.forEach { $0.source.cancel() }
         watches.removeAll()
         snapshots.removeAll()
@@ -279,15 +308,27 @@ public final class FolderWatcher: @unchecked Sendable {
         let new = current.newEntries(comparedTo: previous)
         guard !new.isEmpty else { return }
 
-        // Dispatched off `queue`, not called inline: `onNewEntries` is the
-        // caller's code, and this call happens while `queue` is doing its own
-        // bookkeeping. A callback that calls back into this watcher (stop(),
-        // reading unavailableFolders) would deadlock if it ran here — sync on
-        // the very queue it is already running on always deadlocks. Running
-        // it on a separate queue means the caller's `.sync` calls target a
-        // `queue` that is genuinely free.
+        // Dispatched to deliveryQueue, not called inline and not on
+        // DispatchQueue.global(): `onNewEntries` is the caller's code, and
+        // this call happens while `queue` is doing its own bookkeeping. A
+        // callback that calls back into this watcher (stop(), reading
+        // unavailableFolders) would deadlock if it ran here — sync on the
+        // very queue it is already running on always deadlocks. A dedicated
+        // serial queue keeps that fix while adding FIFO ordering and no
+        // thread-pool growth under a burst, for free.
+        //
+        // The generation check below is a separate fix: moving delivery off
+        // `queue` made it possible for a delivery scheduled just before
+        // stop() to still land afterwards — mid-restart, or after teardown —
+        // filing a stale arrival against whatever folder happens to be
+        // current by then. Capturing `generation` now and re-checking it
+        // when the delivery actually runs drops anything scheduled against a
+        // generation that has since moved on.
+        let deliveryGeneration = generation
         let callback = onNewEntries
-        DispatchQueue.global().async {
+        deliveryQueue.async { [weak self] in
+            guard let self else { return }
+            guard self.queue.sync(execute: { self.generation }) == deliveryGeneration else { return }
             callback(new)
         }
     }

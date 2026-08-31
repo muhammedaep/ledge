@@ -266,6 +266,141 @@ import Foundation
     #expect(watcher.descriptorLeakBalanceForTesting == 0)
 }
 
+@Test func noEmissionArrivesAfterStopReturns() async throws {
+    // Finding 1 (round 2): dispatching the callback off `queue` fixed the
+    // deadlock but traded it for a lifecycle hole — a delivery already
+    // scheduled when stop() is called could still land afterwards, e.g.
+    // mid-restart, filing an arrival against whatever folder wins the race.
+    // A queue-confined generation counter (bumped by stopLocked, which both
+    // start() and stop() go through) is captured when a delivery is
+    // scheduled and re-checked when it actually runs; a stale delivery is
+    // dropped.
+    //
+    // To observe this deterministically: the "first.png" callback blocks on
+    // a semaphore before recording anything, so the test can be sure a
+    // second, already-scheduled delivery for "second.png" is still sitting
+    // behind it on the (now serial) delivery queue — not racing to complete
+    // before stop() can bump the generation. The only timing dependency left
+    // is "did the real write event for second.png get processed by `queue`
+    // within 500ms" — unrelated to, and unblocked by, the stalled delivery
+    // queue, and generous given every other real-event test in this file
+    // observes delivery within a few hundred milliseconds at most.
+    let temp = try TempDirectory()
+    let box = Box()
+    let releaseFirst = DispatchSemaphore(value: 0)
+    let firstArrived = DispatchSemaphore(value: 0)
+    defer { releaseFirst.signal() } // never leave the delivery queue's worker blocked
+
+    let watcher = FolderWatcher(folders: [temp.url]) { urls in
+        if urls.contains(where: { $0.lastPathComponent == "first.png" }) {
+            firstArrived.signal()
+            releaseFirst.wait()
+        }
+        box.add(urls)
+    }
+    watcher.start()
+    defer { watcher.stop() }
+
+    try temp.writeFile("first.png")
+    try #require(blockingWait(firstArrived, timeout: .now() + 5) == .success)
+
+    try temp.writeFile("second.png")
+    try await Task.sleep(for: .milliseconds(500))
+
+    watcher.stop() // bumps the generation while "second.png"'s delivery is still queued, unstarted
+    releaseFirst.signal() // let "first.png" finish; the delivery queue then reaches "second.png"
+
+    try await Task.sleep(for: .milliseconds(300))
+    #expect(!box.names.contains("second.png"), "a delivery scheduled before stop() must not land after it")
+}
+
+@Test func secondMissingFolderStaysReconnectableAfterFirstReconnects() async throws {
+    // Finding 3a: stopReconnectTimerLockedIfIdle's `_unavailableFolders
+    // .isEmpty` guard matters as soon as more than one folder can be
+    // unavailable at once — without it, any single folder reconnecting would
+    // stop the poll outright, orphaning every other still-missing folder,
+    // exactly like finding 1 from round one, just multiplied.
+    let missingA = URL(fileURLWithPath: "/tmp/ledge-missing-a-\(UUID().uuidString)")
+    let missingB = URL(fileURLWithPath: "/tmp/ledge-missing-b-\(UUID().uuidString)")
+    defer {
+        try? FileManager.default.removeItem(at: missingA)
+        try? FileManager.default.removeItem(at: missingB)
+    }
+
+    let box = Box()
+    let watcher = FolderWatcher(
+        folders: [missingA, missingB],
+        onNewEntries: { urls in box.add(urls) },
+        reconnectPollInterval: .milliseconds(20),
+        emptinessSettleDelay: .milliseconds(30),
+        reconnectLeeway: .milliseconds(5)
+    )
+    watcher.start()
+    defer { watcher.stop() }
+
+    #expect(Set(watcher.unavailableFolders) == [missingA, missingB])
+    #expect(watcher.isReconnectTimerRunningForTesting)
+
+    try FileManager.default.createDirectory(at: missingA, withIntermediateDirectories: true)
+    try await waitUntil(timeout: .seconds(5)) { !watcher.unavailableFolders.contains(missingA) }
+
+    // missingB is still gone — the poll must still be running for it.
+    #expect(watcher.isReconnectTimerRunningForTesting, "a second missing folder must keep the poll alive")
+    #expect(watcher.unavailableFolders.contains(missingB))
+
+    try FileManager.default.createDirectory(at: missingB, withIntermediateDirectories: true)
+    try await waitUntil(timeout: .seconds(5)) { !watcher.unavailableFolders.contains(missingB) }
+
+    try "x".write(to: missingB.appendingPathComponent("proof.png"), atomically: true, encoding: .utf8)
+    try await waitUntil(timeout: .seconds(5)) { box.names.contains("proof.png") }
+    #expect(box.names.contains("proof.png"), "the second folder must still be reconnected and watched")
+}
+
+@Test func duplicateWatchedFolderStillDetectsNewFiles() async throws {
+    // Finding 3b: the fd-balance test alone doesn't prove the surviving watch
+    // is actually live — a wrong "fix" could cancel the right descriptor
+    // (balance reads zero) while leaving `watches[folder]` pointing at the
+    // now-dead source, silently unwatching the folder without ever flagging
+    // it unavailable. This proves the watch that
+    // duplicateWatchedFolderDoesNotLeakADescriptor leaves behind still
+    // actually detects new files, not just that its fd count balances.
+    let temp = try TempDirectory()
+    let box = Box()
+    let watcher = FolderWatcher(folders: [temp.url, temp.url]) { urls in box.add(urls) }
+    watcher.start()
+    defer { watcher.stop() }
+
+    try temp.writeFile("arrived.png")
+    try await waitUntil(timeout: .seconds(5)) { box.names.contains("arrived.png") }
+
+    #expect(box.count(of: "arrived.png") == 1)
+}
+
+@Test func descriptorBalanceStaysZeroWhileFolderIsUnavailable() async throws {
+    // Finding 3c: without source.cancel() in markMissingLocked, every folder
+    // disappearance leaks one descriptor. Measured directly via the leak
+    // balance rather than only inferred from unavailableFolders, since the
+    // balance is what actually tracks the real OS resource.
+    let temp = try TempDirectory()
+    let watcher = FolderWatcher(
+        folders: [temp.url],
+        onNewEntries: { _ in },
+        reconnectPollInterval: .milliseconds(20),
+        emptinessSettleDelay: .milliseconds(30),
+        reconnectLeeway: .milliseconds(5)
+    )
+    watcher.start()
+    defer { watcher.stop() }
+
+    try FileManager.default.removeItem(at: temp.url)
+    try await waitUntil(timeout: .seconds(5)) { watcher.unavailableFolders.contains(temp.url) }
+
+    try await waitUntil(timeout: .seconds(5)) { watcher.descriptorLeakBalanceForTesting == 0 }
+    #expect(
+        watcher.descriptorLeakBalanceForTesting == 0,
+        "a folder going unavailable must close its old descriptor, not leak it")
+}
+
 // MARK: - helpers
 
 private final class Box: @unchecked Sendable {
@@ -303,4 +438,12 @@ private func waitUntil(
 
 private func isOpenDescriptor(_ descriptor: Int32) -> Bool {
     fcntl(descriptor, F_GETFD) != -1
+}
+
+/// `DispatchSemaphore.wait` is unavailable directly inside an `async`
+/// function body (it would block a cooperative-pool thread) — this
+/// synchronous wrapper is the sanctioned way to still use one deliberately,
+/// off the async call site, to synchronize with a background callback.
+private func blockingWait(_ semaphore: DispatchSemaphore, timeout: DispatchTime) -> DispatchTimeoutResult {
+    semaphore.wait(timeout: timeout)
 }
