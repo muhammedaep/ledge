@@ -12,6 +12,9 @@
 		A1B2C3D400114455AA660002 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660001 /* Preferences.swift */; };
 		A1B2C3D400114455AA660004 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660003 /* AppState.swift */; };
 		A1B2C3D400114455AA660005 /* LedgeCore in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D400114455AA660007 /* LedgeCore */; };
+		A1B2C3D400114455AA660009 /* ShelfRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660008 /* ShelfRow.swift */; };
+		A1B2C3D400114455AA66000B /* OrganizeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66000A /* OrganizeSheet.swift */; };
+		A1B2C3D400114455AA66000D /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66000C /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -20,6 +23,9 @@
 		79F2B1F6E27F4C7DAA626279 /* ShelfView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfView.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA660001 /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA660003 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		A1B2C3D400114455AA660008 /* ShelfRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfRow.swift; sourceTree = "<group>"; };
+		A1B2C3D400114455AA66000A /* OrganizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizeSheet.swift; sourceTree = "<group>"; };
+		A1B2C3D400114455AA66000C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -49,6 +55,8 @@
 				A1B2C3D400114455AA660003 /* AppState.swift */,
 				A1B2C3D400114455AA660001 /* Preferences.swift */,
 				19C7F09942DB4C26BB9C6052 /* Shelf */,
+				A1B2C3D400114455AA66000E /* Organize */,
+				A1B2C3D400114455AA66000F /* Settings */,
 			);
 			path = Ledge;
 			sourceTree = "<group>";
@@ -57,8 +65,25 @@
 			isa = PBXGroup;
 			children = (
 				79F2B1F6E27F4C7DAA626279 /* ShelfView.swift */,
+				A1B2C3D400114455AA660008 /* ShelfRow.swift */,
 			);
 			path = Shelf;
+			sourceTree = "<group>";
+		};
+		A1B2C3D400114455AA66000E /* Organize */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D400114455AA66000A /* OrganizeSheet.swift */,
+			);
+			path = Organize;
+			sourceTree = "<group>";
+		};
+		A1B2C3D400114455AA66000F /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D400114455AA66000C /* SettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 		DF2E10727A7D47598DD16158 /* Products */ = {
@@ -147,6 +172,9 @@
 				A1B2C3D400114455AA660004 /* AppState.swift in Sources */,
 				A1B2C3D400114455AA660002 /* Preferences.swift in Sources */,
 				23262EB335314923875619E8 /* ShelfView.swift in Sources */,
+				A1B2C3D400114455AA660009 /* ShelfRow.swift in Sources */,
+				A1B2C3D400114455AA66000B /* OrganizeSheet.swift in Sources */,
+				A1B2C3D400114455AA66000D /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

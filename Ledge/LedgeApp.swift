@@ -14,10 +14,21 @@ struct LedgeApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("Ledge", systemImage: "tray.and.arrow.down") {
+        // The icon changes shape while a project is active, so the user can see
+        // that downloads are being diverted without opening the shelf.
+        MenuBarExtra {
             ShelfView()
                 .environment(state)
+        } label: {
+            Image(systemName: state.activeProject == nil
+                  ? "tray.and.arrow.down"
+                  : "folder.fill")
         }
         .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView()
+                .environment(state)
+        }
     }
 }
