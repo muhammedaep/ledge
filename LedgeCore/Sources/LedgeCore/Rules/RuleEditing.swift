@@ -72,19 +72,26 @@ public extension Category {
     /// not have predicted, so an editor can *say* so rather than only showing
     /// the result and hoping it is noticed.
     ///
-    /// Lowercasing and dropping a leading dot are deliberately not reported.
+    /// Lowercasing and dots at either edge are deliberately not reported.
     /// Everyone types `.PNG` sometimes and everyone expects it to mean `png`;
     /// reporting that would keep a note under the field almost permanently and
     /// train the user to ignore the one case that matters. What is reported is a
     /// token that lost something it looked like it kept — `.tar.gz` stored as
     /// `gz`, `*.png` as `png` — or one thrown away entirely.
+    ///
+    /// A *trailing* dot is an edge dot for the same reason a leading one is,
+    /// and treating it as anything else made the note lie. `png.` stores `png`,
+    /// so a note saying it kept "the part after the last dot" described an
+    /// empty string. It fired mid-edit, too: typing `.tar.gz` passes through
+    /// `.tar.`, putting a false sentence under the field during the very edit
+    /// the note exists for.
     static func extensionRewrites(in text: String) -> [ExtensionRewrite] {
         var rewrites: [ExtensionRewrite] = []
         for token in text.split(whereSeparator: { $0 == "," || $0.isWhitespace }) {
             let typed = String(token)
-            // What the two expected conventions alone would produce. A token
-            // that survives as this held no surprise worth reporting.
-            let expected = String(typed.lowercased().drop { $0 == "." })
+            // What the expected conventions alone would produce. A token that
+            // survives as this held no surprise worth reporting.
+            let expected = typed.lowercased().trimmingCharacters(in: Self.dots)
             guard !expected.isEmpty else { continue }
             let stored = normalizedExtension(typed)
             guard stored != expected else { continue }
@@ -92,6 +99,8 @@ public extension Category {
         }
         return rewrites
     }
+
+    private static let dots = CharacterSet(charactersIn: ".")
 }
 
 // MARK: - Folder names
@@ -260,4 +269,66 @@ public extension RuleSet {
 
     /// Whether this rule set is safe to commit.
     var canBeSaved: Bool { !problems.contains(where: \.blocksSaving) }
+}
+
+// MARK: - Refusing and repairing
+
+public extension RuleSet {
+    /// Why a rule set cannot be written.
+    ///
+    /// Carries the offending names rather than a sentence, so the message can be
+    /// worded where it is shown.
+    struct Unusable: Error, Hashable, Sendable {
+        /// The names that cannot be folders, in rule-set order. The fallback's
+        /// name appears last when it is one of them.
+        public let names: [String]
+
+        public init(names: [String]) {
+            self.names = names
+        }
+    }
+
+    /// This rule set, or an error naming what makes it unwritable.
+    ///
+    /// The check lives here rather than in the app target for the reason this
+    /// project keeps rediscovering: a rule in the app target is a rule nobody
+    /// can test. `AppState` has no test target by design, so a guard written
+    /// there survives being mutated to a no-op and proves nothing.
+    func validated() throws -> RuleSet {
+        let unusable = problems.compactMap { problem -> String? in
+            guard case let .unusableName(_, name, _) = problem else { return nil }
+            return name
+        }
+        guard unusable.isEmpty else { throw Unusable(names: unusable) }
+        return self
+    }
+
+    /// The nearest usable rule set to this one, for a file that parsed but says
+    /// something Ledge must not act on.
+    ///
+    /// A hand-edited `rules.json` can hold a category with a blank name, or a
+    /// `..` fallback. Nothing rejects it on the way in, and `Categorizer`
+    /// appends whatever it finds as a path component — so a blank name files
+    /// every match straight back into the folder it came from, and `..` files
+    /// into the parent, quietly, on every download from then on.
+    ///
+    /// The repair is the smallest one that removes the hazard. An unusable
+    /// category is dropped, not renamed: its extensions fall through to the
+    /// next rule that claims them, or to the fallback, which is a defined
+    /// outcome the user can see in the editor. The fallback itself cannot be
+    /// dropped — something has to catch unmatched files — so an unusable one
+    /// reverts to the default name.
+    ///
+    /// Deliberately *not* "quarantine the file and load the defaults", which is
+    /// what an unparseable file gets. That file cannot be read at all; this one
+    /// can, and throwing away every rule the user wrote because one name is
+    /// blank is a far larger loss than the one being repaired.
+    func sanitized() -> RuleSet {
+        var repaired = self
+        repaired.categories = categories.filter { Category.isUsableFolderName($0.name) }
+        if !Category.isUsableFolderName(fallbackName) {
+            repaired.fallbackName = RuleSet.defaults.fallbackName
+        }
+        return repaired
+    }
 }

@@ -8,6 +8,11 @@ public final class RulesStore {
 
     public private(set) var lastLoadWasCorrupt = false
 
+    /// True when the last load read a file that parsed but held a rule Ledge
+    /// must not act on, and repaired it. Distinct from `lastLoadWasCorrupt`:
+    /// nothing was quarantined and most of the user's rules survived.
+    public private(set) var lastLoadWasRepaired = false
+
     public init(directory: URL) {
         self.directory = directory
     }
@@ -21,10 +26,19 @@ public final class RulesStore {
 
     public func load() -> RuleSet {
         lastLoadWasCorrupt = false
+        lastLoadWasRepaired = false
         guard let data = try? Data(contentsOf: fileURL) else { return .defaults }
 
         do {
-            return try JSONDecoder().decode(RuleSet.self, from: data)
+            // Parsing is not the same as being usable. A hand-edited file can
+            // decode perfectly and still name a category "" or "..", which
+            // `Categorizer` would append as a path component — filing every
+            // match back into the folder it came from, or into the parent.
+            // Nothing downstream checks, so the check belongs on the way in.
+            let decoded = try JSONDecoder().decode(RuleSet.self, from: data)
+            let sanitized = decoded.sanitized()
+            lastLoadWasRepaired = sanitized != decoded
+            return sanitized
         } catch {
             lastLoadWasCorrupt = true
             quarantine()
@@ -32,7 +46,11 @@ public final class RulesStore {
         }
     }
 
+    /// Writes the rule set, refusing one that names a folder Ledge must not
+    /// file into. The refusal is here rather than only at the caller because
+    /// this is the boundary every future caller has to come through.
     public func save(_ rules: RuleSet) throws {
+        let rules = try rules.validated()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

@@ -35,6 +35,11 @@ struct RulesPane: View {
     /// two separate events.
     @State private var tidyToken = 0
 
+    /// Set when a Save was refused or failed to write, cleared as soon as the
+    /// draft changes — a stale "couldn't save" beside a draft the user has since
+    /// fixed would be its own small lie.
+    @State private var saveFailed = false
+
     private var isDirty: Bool { draft != state.rules }
 
     var body: some View {
@@ -52,6 +57,8 @@ struct RulesPane: View {
             draft = state.rules
             hasLoadedDraft = true
         }
+        // The complaint belongs to the draft that earned it.
+        .onChange(of: draft) { saveFailed = false }
         .confirmationDialog(
             "Replace your categories with the defaults?",
             isPresented: $confirmingReset
@@ -134,7 +141,16 @@ struct RulesPane: View {
 
             Spacer()
 
-            if !draft.canBeSaved {
+            // A failed save is reported here, next to the button that failed.
+            // `AppState.lastError` alone would not do: it is rendered by the
+            // shelf and the Organize sheet, so a refusal earned by clicking
+            // Save in Settings would appear in the menu bar popover instead —
+            // somewhere the user is not looking.
+            if saveFailed {
+                Text("Couldn't save. Nothing was changed.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            } else if !draft.canBeSaved {
                 Text("Fix the highlighted name to save.")
                     .font(.caption)
                     .foregroundStyle(.red)
@@ -144,13 +160,17 @@ struct RulesPane: View {
                     .foregroundStyle(.secondary)
             }
 
-            Button("Discard Changes") { replaceDraft(with: state.rules) }
-                .disabled(!isDirty)
+            Button("Discard Changes") {
+                replaceDraft(with: state.rules)
+                saveFailed = false
+            }
+            .disabled(!isDirty)
             Button("Save") {
-                state.updateRules(draft)
-                // The save is what makes the stored spelling the truth, so it
-                // is what the fields have to catch up to.
-                tidyToken += 1
+                saveFailed = !state.updateRules(draft)
+                // A save is what makes the stored spelling the truth, so it is
+                // what the fields have to catch up to. A refused one changed
+                // nothing, so there is nothing for them to catch up to.
+                if !saveFailed { tidyToken += 1 }
             }
             .keyboardShortcut(.defaultAction)
             .disabled(!isDirty || !draft.canBeSaved)
@@ -348,9 +368,15 @@ private struct CategoryRow: View {
 
         if !kept.isEmpty {
             let list = kept.formatted(.list(type: .and))
+            // "the last dot-separated piece", not "the part after the last
+            // dot". The second is false whenever the token ends in a dot —
+            // `a.b.` keeps `b`, while the part after its last dot is nothing —
+            // and this sentence is the only thing the user is asked to trust
+            // about what got stored. `everyReportedRewriteReallyKeptTheLastDotSeparatedPiece`
+            // sweeps it.
             notes.append(RuleMessage(
                 text: String(localized: """
-                    Stored as \(list) — a rule matches only the part after the last dot.
+                    Stored as \(list) — an extension is the last dot-separated piece of a name.
                     """),
                 isBlocking: false))
         }

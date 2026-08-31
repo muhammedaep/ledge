@@ -239,27 +239,33 @@ final class AppState {
 
     // MARK: - Rules and projects
 
-    /// Commits a rule set, refusing one that would file downloads somewhere the
-    /// user did not choose.
+    /// Commits a rule set. Returns whether it was written.
     ///
-    /// The rules pane disables Save on the same condition, so today this guard
-    /// never fires. It is here because the gate has to live at the boundary and
-    /// not only on the button: a category name is appended to a URL as one path
-    /// component, and an empty one files every match back into the folder it
-    /// came from while `..` files into the parent — silently, in the background,
-    /// on every download from then on. A second caller added later inherits a
-    /// disabled button not at all.
+    /// The refusal itself is `RulesStore.save`'s, in LedgeCore. It used to be a
+    /// `guard` right here, which addressed the danger but proved nothing:
+    /// mutating that guard to a no-op killed no test, because this target has
+    /// none by design. A rule in the app target is a rule nobody can test.
     ///
-    /// `RuleSet.canBeSaved` is the same rule the pane reads, from LedgeCore,
-    /// where it is tested. Only names block; a duplicate or a shadowed
-    /// extension is a state a user can legitimately mean.
-    func updateRules(_ newRules: RuleSet) {
-        guard newRules.canBeSaved else {
-            lastError = String(localized: "Those rules weren't saved — every category needs a folder name.")
-            return
+    /// In-memory rules follow the file rather than leading it. A refused or
+    /// failed write leaves `rules` exactly as it was, so what Ledge files by
+    /// never diverges from what it would load on next launch — and the pane
+    /// still holds the user's draft, so nothing they typed is lost.
+    @discardableResult
+    func updateRules(_ newRules: RuleSet) -> Bool {
+        do {
+            try rulesStore.save(newRules)
+            rules = newRules
+            return true
+        } catch let unusable as RuleSet.Unusable {
+            // Names, not a disk problem — and worth naming, since the whole
+            // point is that the user cannot see where the bad one is.
+            let names = unusable.names.map { "“\($0)”" }.formatted(.list(type: .and))
+            lastError = String(localized: "Those rules weren't saved: \(names) can't be a folder name.")
+            return false
+        } catch {
+            lastError = String(localized: "Couldn't save your rules.")
+            return false
         }
-        rules = newRules
-        try? rulesStore.save(newRules)
     }
 
     var activeProject: Project? {

@@ -111,6 +111,68 @@ import Foundation
     #expect(Category.extensionRewrites(in: "") == [])
 }
 
+/// A trailing dot is edge punctuation, exactly like a leading one.
+///
+/// Reporting it made the editor's note false: `png.` stores `png`, and a note
+/// describing what was kept as coming after the last dot names an empty string.
+/// The mid-edit case is the one that mattered — typing `.tar.gz` passes through
+/// `.tar.`, so the false sentence appeared under the field during the very edit
+/// the note exists for.
+@Test func dotsAtEitherEdgeAreNotWorthReporting() {
+    #expect(Category.extensionRewrites(in: "png.") == [])
+    #expect(Category.extensionRewrites(in: ".png.") == [])
+    #expect(Category.extensionRewrites(in: "..png..") == [])
+    #expect(Category.extensionRewrites(in: ".tar.") == [])       // typed on the way to .tar.gz
+    #expect(Category.extensionRewrites(in: "PNG.") == [])
+}
+
+/// The sweep the note's wording has to survive.
+///
+/// `RulesPane` tells the user a reported token was stored as "the last
+/// dot-separated piece" of what they typed. That sentence is the one thing the
+/// user is asked to trust about what got stored, so it has to be true every
+/// time it appears, not merely usually — the previous wording was false for 44
+/// tokens of length 3 or less. This checks exhaustively over every string up to
+/// length 4 built from the characters that make the rule branch.
+///
+/// The claim is spelled out with `components(separatedBy:)` rather than the
+/// `split(separator:)` the implementation uses, so this checks the sentence's
+/// meaning rather than restating the code.
+@Test func everyReportedRewriteReallyKeptTheLastDotSeparatedPiece() {
+    let alphabet: [Character] = [".", "a", "B", "/", ":", " ", ","]
+    var tokens: Set<String> = [""]
+    var frontier: [String] = [""]
+    for _ in 1...4 {
+        frontier = frontier.flatMap { prefix in alphabet.map { prefix + String($0) } }
+        tokens.formUnion(frontier)
+    }
+
+    var checkedStored = 0
+    var checkedDropped = 0
+    for token in tokens {
+        for rewrite in Category.extensionRewrites(in: token) {
+            guard let stored = rewrite.stored else {
+                // The other sentence the pane shows: a dropped token is one
+                // carrying a separator.
+                #expect(rewrite.typed.contains("/") || rewrite.typed.contains(":"),
+                        "“\(rewrite.typed)” was dropped for a reason the note does not give")
+                checkedDropped += 1
+                continue
+            }
+            let pieces = rewrite.typed
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+                .components(separatedBy: ".")
+                .filter { !$0.isEmpty }
+            #expect(stored == pieces.last,
+                    "“\(rewrite.typed)” stored “\(stored)”, not its last dot-separated piece")
+            checkedStored += 1
+        }
+    }
+    #expect(checkedStored > 0, "the sweep found no rewrite to check")
+    #expect(checkedDropped > 0, "the sweep found no dropped token to check")
+}
+
 @Test func everyRewriteInAPastedFieldIsReportedInOrder() {
     #expect(Category.extensionRewrites(in: "png, .tar.gz, jpg, *.webp") == [
         Category.ExtensionRewrite(typed: ".tar.gz", stored: "gz"),
@@ -336,4 +398,102 @@ import Foundation
         .noExtensions(category: images.id),
         .hiddenName(category: nil, name: ".Other")
     ])
+}
+
+// MARK: - Refusing a write
+
+@Test func aValidRuleSetPassesValidationUnchanged() throws {
+    #expect(try RuleSet.defaults.validated() == RuleSet.defaults)
+}
+
+@Test func validationRefusesAnUnusableCategoryName() {
+    let rules = RuleSet(categories: [
+        Category(name: "Images", extensions: ["png"]),
+        Category(name: "  ", extensions: ["mp4"])
+    ])
+    #expect(throws: RuleSet.Unusable(names: ["  "])) { try rules.validated() }
+}
+
+@Test func validationRefusesAnUnusableFallbackName() {
+    let rules = RuleSet(categories: [Category(name: "Images", extensions: ["png"])],
+                        fallbackName: "..")
+    #expect(throws: RuleSet.Unusable(names: [".."])) { try rules.validated() }
+}
+
+/// Only names block. A duplicate or a shadowed extension is a state a user can
+/// legitimately mean, and refusing to write one would be a different decision
+/// from the one this editor made.
+@Test func validationAllowsEverythingThatIsOnlyAWarning() throws {
+    let rules = RuleSet(categories: [
+        Category(name: "Images", extensions: ["png"]),
+        Category(name: "images", extensions: ["png"]),
+        Category(name: ".Hidden", extensions: [])
+    ])
+    #expect(!rules.problems.isEmpty)
+    #expect(try rules.validated() == rules)
+}
+
+// MARK: - Repairing a read
+
+@Test func aGoodRuleSetIsNotChangedByRepair() {
+    #expect(RuleSet.defaults.sanitized() == RuleSet.defaults)
+}
+
+/// The hazard this closes: `Categorizer` appends `Category.name` as a path
+/// component without checking it, so a blank name files every match back into
+/// the folder it came from.
+@Test func repairDropsACategoryThatCannotBeAFolder() {
+    let good = Category(name: "Images", extensions: ["png"])
+    let blank = Category(name: "", extensions: ["mp4"])
+    let escaping = Category(name: "../Elsewhere", extensions: ["zip"])
+    let repaired = RuleSet(categories: [good, blank, escaping]).sanitized()
+
+    #expect(repaired.categories == [good])
+    #expect(repaired.canBeSaved)
+}
+
+/// The fallback cannot be dropped — something has to catch unmatched files — so
+/// it reverts instead.
+@Test func repairRevertsAnUnusableFallbackRatherThanDroppingIt() {
+    let repaired = RuleSet(categories: [Category(name: "Images", extensions: ["png"])],
+                           fallbackName: "..").sanitized()
+
+    #expect(repaired.fallbackName == "Other")
+    #expect(repaired.categories.count == 1)
+    #expect(repaired.canBeSaved)
+}
+
+/// Repair is the smallest change that removes the hazard: everything the user
+/// wrote that *can* be honoured is kept, including the warnings.
+@Test func repairKeepsEveryRuleItDoesNotHaveToRemove() {
+    let rules = RuleSet(categories: [
+        Category(name: "Images", extensions: ["png"], subdivision: .byMonth),
+        Category(name: "images", extensions: ["png"]),
+        Category(name: "", extensions: ["mp4"]),
+        Category(name: ".Hidden", extensions: [])
+    ])
+    let repaired = rules.sanitized()
+
+    #expect(repaired.categories.map(\.name) == ["Images", "images", ".Hidden"])
+    #expect(repaired.categories[0].subdivision == .byMonth)
+    #expect(!repaired.problems.isEmpty)   // the warnings survive; only the hazard went
+}
+
+/// Whatever repair returns must be writable, or the two rules disagree and a
+/// loaded file could never be saved back.
+@Test func anythingRepairProducesCanBeSaved() throws {
+    let hostile = RuleSet(categories: [
+        Category(name: "", extensions: ["a"]),
+        Category(name: "  ", extensions: ["b"]),
+        Category(name: ".", extensions: ["c"]),
+        Category(name: "..", extensions: ["d"]),
+        Category(name: "a/b", extensions: ["e"]),
+        Category(name: "a:b", extensions: ["f"]),
+        Category(name: "Keep", extensions: ["g"])
+    ], fallbackName: "/")
+
+    let repaired = hostile.sanitized()
+    #expect(repaired.categories.map(\.name) == ["Keep"])
+    #expect(repaired.fallbackName == "Other")
+    #expect(try repaired.validated() == repaired)
 }
