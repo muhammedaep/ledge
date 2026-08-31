@@ -52,6 +52,48 @@ public extension Category {
     }
 }
 
+// MARK: - What parsing changed
+
+public extension Category {
+    /// A token the user typed that is not stored the way they typed it.
+    struct ExtensionRewrite: Hashable, Sendable {
+        /// The token exactly as typed.
+        public let typed: String
+        /// What is stored for it, or nil when it was dropped entirely.
+        public let stored: String?
+
+        public init(typed: String, stored: String?) {
+            self.typed = typed
+            self.stored = stored
+        }
+    }
+
+    /// The tokens in a typed field that parsing changed in a way the user could
+    /// not have predicted, so an editor can *say* so rather than only showing
+    /// the result and hoping it is noticed.
+    ///
+    /// Lowercasing and dropping a leading dot are deliberately not reported.
+    /// Everyone types `.PNG` sometimes and everyone expects it to mean `png`;
+    /// reporting that would keep a note under the field almost permanently and
+    /// train the user to ignore the one case that matters. What is reported is a
+    /// token that lost something it looked like it kept — `.tar.gz` stored as
+    /// `gz`, `*.png` as `png` — or one thrown away entirely.
+    static func extensionRewrites(in text: String) -> [ExtensionRewrite] {
+        var rewrites: [ExtensionRewrite] = []
+        for token in text.split(whereSeparator: { $0 == "," || $0.isWhitespace }) {
+            let typed = String(token)
+            // What the two expected conventions alone would produce. A token
+            // that survives as this held no surprise worth reporting.
+            let expected = String(typed.lowercased().drop { $0 == "." })
+            guard !expected.isEmpty else { continue }
+            let stored = normalizedExtension(typed)
+            guard stored != expected else { continue }
+            rewrites.append(ExtensionRewrite(typed: typed, stored: stored))
+        }
+        return rewrites
+    }
+}
+
 // MARK: - Folder names
 
 public extension Category {
@@ -64,21 +106,46 @@ public extension Category {
     /// hierarchy the user never asked for. None of those report an error — they
     /// just move the user's downloads somewhere they did not choose.
     static func isUsableFolderName(_ name: String) -> Bool {
+        folderNameFault(name) == nil
+    }
+
+    /// Why a name cannot be a folder, or nil when it can be.
+    ///
+    /// One function rather than two, because a caller that needs to *say* what
+    /// is wrong would otherwise re-derive "is it blank" beside this one, and
+    /// the two definitions drift the moment either changes.
+    static func folderNameFault(_ name: String) -> NameFault? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed != ".", trimmed != ".." else { return false }
-        return !trimmed.contains("/") && !trimmed.contains(":") && !trimmed.contains("\0")
+        if trimmed.isEmpty { return .blank }
+        guard trimmed != ".", trimmed != "..",
+              !trimmed.contains("/"), !trimmed.contains(":"), !trimmed.contains("\0")
+        else { return .notAFolderName }
+        return nil
+    }
+
+    /// What is wrong with a name that cannot be a folder.
+    enum NameFault: Hashable, Sendable {
+        /// Nothing to name a folder with.
+        case blank
+        /// Something is there, but it names a place instead of a folder — `..`,
+        /// or a name carrying a path separator.
+        case notAFolderName
     }
 
     /// The key two folder names are the same under.
     ///
-    /// Matches how the volume behaves rather than how the strings compare:
-    /// macOS file systems are case-insensitive by default and treat the two
-    /// Unicode spellings of an accented character as one name, so `Images` and
-    /// `images` are one folder no matter how the rule set spells them.
+    /// Matches how the volume behaves rather than how the strings compare: a
+    /// macOS volume is case-insensitive by default and treats the two Unicode
+    /// spellings of an accented character as one name, so `Images` and `images`
+    /// are one folder no matter how the rule set spells them.
+    ///
+    /// Surrounding whitespace is deliberately *not* trimmed here, though
+    /// `folderNameFault` trims to decide whether anything is there at all.
+    /// ` Images ` and `Images` are two different folders on every volume, so
+    /// folding them together here would have made the editor tell the user they
+    /// share one — which is simply untrue.
     static func folderNameKey(_ name: String) -> String {
-        name.trimmingCharacters(in: .whitespacesAndNewlines)
-            .precomposedStringWithCanonicalMapping
-            .lowercased()
+        name.precomposedStringWithCanonicalMapping.lowercased()
     }
 }
 
@@ -94,11 +161,18 @@ public extension RuleSet {
     enum Problem: Hashable, Sendable {
         /// The name cannot be a folder, so this rule would file somewhere the
         /// user did not choose. The only problem that blocks saving.
-        case unusableName(category: Category.ID?, name: String)
+        case unusableName(category: Category.ID?, name: String, fault: Category.NameFault)
         /// Two rules name the same folder. Both are live and both file into it,
         /// so the editor shows two rules where the disk has one folder — with
         /// whichever subdivisions each of them sets, mixed together inside it.
-        case duplicateName(category: Category.ID?, name: String)
+        ///
+        /// `exact` separates the two ways that happens, because only one of
+        /// them is true everywhere. Identical names are one folder on any
+        /// volume. Names differing only in case or Unicode spelling are one
+        /// folder on a case-insensitive volume, which is the macOS default but
+        /// not a guarantee — a case-sensitive APFS volume really does keep
+        /// `Images` and `images` apart.
+        case duplicateName(category: Category.ID?, name: String, exact: Bool)
         /// A leading dot makes the destination invisible in Finder. Legal, and
         /// occasionally deliberate, but rarely what someone means to type.
         case hiddenName(category: Category.ID?, name: String)
@@ -124,7 +198,7 @@ public extension RuleSet {
         /// The category this is about, or nil when it is about the fallback.
         public var category: Category.ID? {
             switch self {
-            case let .unusableName(id, _), let .duplicateName(id, _), let .hiddenName(id, _):
+            case let .unusableName(id, _, _), let .duplicateName(id, _, _), let .hiddenName(id, _):
                 return id
             case let .noExtensions(id), let .shadowedExtension(id, _, _):
                 return id
@@ -137,20 +211,24 @@ public extension RuleSet {
     var problems: [Problem] {
         var found: [Problem] = []
 
+        let allNames = categories.map(\.name) + [fallbackName]
         var nameCounts: [String: Int] = [:]
-        for name in categories.map(\.name) + [fallbackName] {
+        var exactCounts: [String: Int] = [:]
+        for name in allNames {
             nameCounts[Category.folderNameKey(name), default: 0] += 1
+            exactCounts[name, default: 0] += 1
         }
 
         func nameProblems(_ name: String, _ id: Category.ID?) -> [Problem] {
-            guard Category.isUsableFolderName(name) else {
+            if let fault = Category.folderNameFault(name) {
                 // A name that is not a folder name cannot also be a duplicate
                 // or hidden one; saying so twice would just bury the fix.
-                return [.unusableName(category: id, name: name)]
+                return [.unusableName(category: id, name: name, fault: fault)]
             }
             var out: [Problem] = []
             if nameCounts[Category.folderNameKey(name), default: 0] > 1 {
-                out.append(.duplicateName(category: id, name: name))
+                out.append(.duplicateName(
+                    category: id, name: name, exact: exactCounts[name, default: 0] > 1))
             }
             if name.hasPrefix(".") {
                 out.append(.hiddenName(category: id, name: name))

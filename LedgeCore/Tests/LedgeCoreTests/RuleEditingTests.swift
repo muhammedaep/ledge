@@ -57,6 +57,81 @@ import Foundation
     #expect(Category.parseExtensions(category.extensionsField) == category.extensions)
 }
 
+/// Rewriting the field to the stored spelling must not change what is stored.
+///
+/// The editor's field and its list update each other: typing reparses into the
+/// list, and ending the edit rewrites the field from the list. If a rewritten
+/// field parsed to anything but the same list, those two would take turns
+/// changing each other for as long as the row was on screen.
+@Test func tidyingTheFieldDoesNotChangeWhatIsStored() {
+    for typed in ["png, .JPG  gif", ".tar.gz", "*.png", ".", "a/b png", "pdf, docx,",
+                  "", "PNG .png png,", "  ", "\t.HEIC\n"] {
+        let stored = Category.parseExtensions(typed)
+        let tidied = Category(name: "x", extensions: stored).extensionsField
+        #expect(Category.parseExtensions(tidied) == stored, "“\(typed)” does not settle")
+        // And a second pass is a no-op, so the field stops moving.
+        #expect(Category(name: "x", extensions: Category.parseExtensions(tidied)).extensionsField == tidied)
+    }
+}
+
+// MARK: - What parsing changed
+
+/// The two conventions everyone already assumes. Reporting these would put a
+/// note under the field almost permanently.
+@Test func lowercasingAndALeadingDotAreNotWorthReporting() {
+    #expect(Category.extensionRewrites(in: "png") == [])
+    #expect(Category.extensionRewrites(in: ".png") == [])
+    #expect(Category.extensionRewrites(in: ".PNG") == [])
+    #expect(Category.extensionRewrites(in: "PNG, .JPG  gif") == [])
+    #expect(Category.extensionRewrites(in: "pdf, docx, txt,") == [])
+}
+
+/// A token that lost something it looked like it kept. This is the case worth
+/// telling the user about: the field says one thing, the rule does another.
+@Test func aTokenThatLostAComponentIsReported() {
+    #expect(Category.extensionRewrites(in: ".tar.gz")
+        == [Category.ExtensionRewrite(typed: ".tar.gz", stored: "gz")])
+    #expect(Category.extensionRewrites(in: "*.png")
+        == [Category.ExtensionRewrite(typed: "*.png", stored: "png")])
+    #expect(Category.extensionRewrites(in: "archive.zip")
+        == [Category.ExtensionRewrite(typed: "archive.zip", stored: "zip")])
+}
+
+@Test func aTokenThrownAwayEntirelyIsReported() {
+    #expect(Category.extensionRewrites(in: "a/b")
+        == [Category.ExtensionRewrite(typed: "a/b", stored: nil)])
+    #expect(Category.extensionRewrites(in: "png a:b")
+        == [Category.ExtensionRewrite(typed: "a:b", stored: nil)])
+}
+
+/// A lone dot had nothing in it to lose, so there is nothing to report.
+@Test func punctuationThatCarriedNothingIsNotReported() {
+    #expect(Category.extensionRewrites(in: ".") == [])
+    #expect(Category.extensionRewrites(in: ". .. png") == [])
+    #expect(Category.extensionRewrites(in: "") == [])
+}
+
+@Test func everyRewriteInAPastedFieldIsReportedInOrder() {
+    #expect(Category.extensionRewrites(in: "png, .tar.gz, jpg, *.webp") == [
+        Category.ExtensionRewrite(typed: ".tar.gz", stored: "gz"),
+        Category.ExtensionRewrite(typed: "*.webp", stored: "webp")
+    ])
+}
+
+/// The guarantee the editor's note depends on: whatever is reported as stored
+/// is what `parseExtensions` actually stored.
+@Test func aReportedRewriteMatchesWhatIsStored() {
+    let text = "png, .tar.gz, a/b, *.webp"
+    let stored = Category.parseExtensions(text)
+    for rewrite in Category.extensionRewrites(in: text) {
+        if let value = rewrite.stored {
+            #expect(stored.contains(value), "\(rewrite.typed) claims \(value), which is not stored")
+        } else {
+            #expect(!stored.contains(rewrite.typed.lowercased()))
+        }
+    }
+}
+
 // MARK: - Folder names
 
 @Test func aFolderNameMustBeAFolderName() {
@@ -73,11 +148,32 @@ import Foundation
     #expect(!Category.isUsableFolderName("a:b"))
 }
 
+/// One decision, one function: a caller that needs to say *why* a name is
+/// unusable reads it here instead of re-deriving "is it blank" beside it.
+@Test func theFaultInANameIsNamed() {
+    #expect(Category.folderNameFault("Images") == nil)
+
+    #expect(Category.folderNameFault("") == .blank)
+    #expect(Category.folderNameFault("   ") == .blank)
+    #expect(Category.folderNameFault("\n") == .blank)
+    #expect(Category.folderNameFault("\t ") == .blank)
+
+    #expect(Category.folderNameFault(".") == .notAFolderName)
+    #expect(Category.folderNameFault("..") == .notAFolderName)
+    #expect(Category.folderNameFault("../Images") == .notAFolderName)
+    #expect(Category.folderNameFault("a:b") == .notAFolderName)
+}
+
 @Test func folderNamesCompareTheWayTheFileSystemDoes() {
+    // Case and Unicode spelling are folded, because a macOS volume folds them.
     #expect(Category.folderNameKey("Images") == Category.folderNameKey("images"))
-    #expect(Category.folderNameKey(" Images ") == Category.folderNameKey("Images"))
     #expect(Category.folderNameKey("Café") == Category.folderNameKey("Cafe\u{0301}"))
     #expect(Category.folderNameKey("Images") != Category.folderNameKey("Videos"))
+
+    // Surrounding whitespace is not folded, because no volume folds it:
+    // ` Images ` and `Images` are two different folders everywhere, and calling
+    // them one would make the editor's duplicate warning a false statement.
+    #expect(Category.folderNameKey(" Images ") != Category.folderNameKey("Images"))
 }
 
 // MARK: - Problems
@@ -100,7 +196,7 @@ import Foundation
     let blank = Category(name: "  ", extensions: ["png"])
     let rules = RuleSet(categories: [blank])
 
-    #expect(rules.problems == [.unusableName(category: blank.id, name: "  ")])
+    #expect(rules.problems == [.unusableName(category: blank.id, name: "  ", fault: .blank)])
     #expect(!rules.canBeSaved)
 }
 
@@ -108,8 +204,20 @@ import Foundation
     let rules = RuleSet(categories: [Category(name: "Images", extensions: ["png"])],
                         fallbackName: "../Elsewhere")
 
-    #expect(rules.problems == [.unusableName(category: nil, name: "../Elsewhere")])
+    #expect(rules.problems == [
+        .unusableName(category: nil, name: "../Elsewhere", fault: .notAFolderName)
+    ])
     #expect(!rules.canBeSaved)
+}
+
+/// A newline-only name is blank, not a bad folder name. The pane words the two
+/// differently, and it reads the difference from here rather than deciding it
+/// again with a slightly different notion of whitespace.
+@Test func aWhitespaceOnlyNameIsBlankWhateverTheWhitespaceIs() {
+    let newline = Category(name: "\n", extensions: ["png"])
+    let rules = RuleSet(categories: [newline])
+
+    #expect(rules.problems == [.unusableName(category: newline.id, name: "\n", fault: .blank)])
 }
 
 /// An unusable name is reported once. Piling `duplicateName` on top of it would
@@ -120,22 +228,48 @@ import Foundation
     let rules = RuleSet(categories: [first, second])
 
     #expect(rules.problems == [
-        .unusableName(category: first.id, name: ""),
-        .unusableName(category: second.id, name: "")
+        .unusableName(category: first.id, name: "", fault: .blank),
+        .unusableName(category: second.id, name: "", fault: .blank)
     ])
 }
 
+/// Names that differ only in case are one folder on a case-insensitive volume —
+/// the macOS default, but not a guarantee. `exact` is false here so the editor
+/// can say "on a case-insensitive disk" rather than asserting it outright.
 @Test func twoCategoriesNamingOneFolderAreFlaggedOnBothRows() {
     let first = Category(name: "Images", extensions: ["png"])
     let second = Category(name: "images", extensions: ["heic"])
     let rules = RuleSet(categories: [first, second])
 
     #expect(rules.problems == [
-        .duplicateName(category: first.id, name: "Images"),
-        .duplicateName(category: second.id, name: "images")
+        .duplicateName(category: first.id, name: "Images", exact: false),
+        .duplicateName(category: second.id, name: "images", exact: false)
     ])
     // A warning, not a refusal: both rules work, they just share one folder.
     #expect(rules.canBeSaved)
+}
+
+/// Identical names are one folder on every volume, so `exact` is true and the
+/// editor can say so without hedging.
+@Test func identicalNamesAreAnExactDuplicate() {
+    let first = Category(name: "Images", extensions: ["png"])
+    let second = Category(name: "Images", extensions: ["heic"])
+    let rules = RuleSet(categories: [first, second])
+
+    #expect(rules.problems == [
+        .duplicateName(category: first.id, name: "Images", exact: true),
+        .duplicateName(category: second.id, name: "Images", exact: true)
+    ])
+}
+
+/// ` Images ` really is a different folder from `Images`, so it is not a
+/// duplicate at all — reporting one would have been a false warning.
+@Test func namesDifferingBySurroundingSpaceAreNotDuplicates() {
+    let rules = RuleSet(categories: [
+        Category(name: "Images", extensions: ["png"]),
+        Category(name: " Images ", extensions: ["heic"])
+    ])
+    #expect(rules.problems.isEmpty)
 }
 
 @Test func aCategoryColldingWithTheFallbackIsFlagged() {
@@ -143,8 +277,8 @@ import Foundation
     let rules = RuleSet(categories: [other], fallbackName: "Other")
 
     #expect(rules.problems == [
-        .duplicateName(category: other.id, name: "Other"),
-        .duplicateName(category: nil, name: "Other")
+        .duplicateName(category: other.id, name: "Other", exact: true),
+        .duplicateName(category: nil, name: "Other", exact: true)
     ])
 }
 

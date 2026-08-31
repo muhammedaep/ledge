@@ -29,6 +29,12 @@ struct RulesPane: View {
     @State private var hasLoadedDraft = false
     @State private var confirmingReset = false
 
+    /// Bumped whenever the draft is committed or replaced wholesale, to tell
+    /// every row's extensions field to stop showing what was typed and show what
+    /// was stored. A counter rather than a flag: two saves in a row have to be
+    /// two separate events.
+    @State private var tidyToken = 0
+
     private var isDirty: Bool { draft != state.rules }
 
     var body: some View {
@@ -50,7 +56,7 @@ struct RulesPane: View {
             "Replace your categories with the defaults?",
             isPresented: $confirmingReset
         ) {
-            Button("Reset to Defaults", role: .destructive) { draft = .defaults }
+            Button("Reset to Defaults", role: .destructive) { replaceDraft(with: .defaults) }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Every category you have added or changed is discarded. Nothing is written until you save.")
@@ -84,6 +90,7 @@ struct RulesPane: View {
                     category: $category,
                     messages: messages(from: problems[category.id] ?? []),
                     position: position(of: category.id),
+                    tidyToken: tidyToken,
                     move: { offset in move(category.id, by: offset) },
                     remove: { remove(category.id) }
                 )
@@ -137,11 +144,16 @@ struct RulesPane: View {
                     .foregroundStyle(.secondary)
             }
 
-            Button("Discard Changes") { draft = state.rules }
+            Button("Discard Changes") { replaceDraft(with: state.rules) }
                 .disabled(!isDirty)
-            Button("Save") { state.updateRules(draft) }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!isDirty || !draft.canBeSaved)
+            Button("Save") {
+                state.updateRules(draft)
+                // The save is what makes the stored spelling the truth, so it
+                // is what the fields have to catch up to.
+                tidyToken += 1
+            }
+            .keyboardShortcut(.defaultAction)
+            .disabled(!isDirty || !draft.canBeSaved)
         }
         .padding(10)
     }
@@ -157,6 +169,15 @@ struct RulesPane: View {
             canMoveUp: index > 0,
             canMoveDown: index < draft.categories.count - 1
         )
+    }
+
+    /// Swaps the whole draft out — a reset or a discard — and tells the rows,
+    /// because a row that keeps its identity across the swap keeps its typed
+    /// text too. `RuleSet.defaults` is a `static let`, so resetting a
+    /// never-saved rule set hands back categories with the very same ids.
+    private func replaceDraft(with newDraft: RuleSet) {
+        draft = newDraft
+        tidyToken += 1
     }
 
     private func move(_ id: Category.ID, by offset: Int) {
@@ -182,17 +203,37 @@ struct RulesPane: View {
 
         for problem in problems {
             switch problem {
-            case let .unusableName(_, name) where name.trimmingCharacters(in: .whitespaces).isEmpty:
+            // The fault comes from LedgeCore rather than being re-derived here.
+            // Asking "is this name blank" a second time, with this file's own
+            // idea of whitespace, is how a name of "\n" ends up being told it
+            // contains a slash.
+            case .unusableName(_, _, .blank):
                 messages.append(RuleMessage(
                     text: String(localized: "This needs a folder name before it can be saved."),
                     isBlocking: true))
-            case .unusableName:
+            case .unusableName(_, _, .notAFolderName):
                 messages.append(RuleMessage(
                     text: String(localized: "A folder name can't contain “/” or “:”, or be only dots."),
                     isBlocking: true))
-            case let .duplicateName(_, name):
+
+            // Two shapes, because only one of them is true on every disk. What
+            // both have to say is the part that is easy to miss: each rule keeps
+            // its own subfolder setting, so one folder ends up holding one
+            // rule's PNG/ next to the other's 2026-09/.
+            case let .duplicateName(_, name, true):
                 messages.append(RuleMessage(
-                    text: String(localized: "Another rule is also called \(name). Both file into the same folder."),
+                    text: String(localized: """
+                        Another rule is also called “\(name)”. They share one folder, \
+                        each still applying its own subfolder setting inside it.
+                        """),
+                    isBlocking: false))
+            case let .duplicateName(_, name, false):
+                messages.append(RuleMessage(
+                    text: String(localized: """
+                        Another rule's name differs from “\(name)” only in capitalisation or \
+                        accent spelling. On a case-insensitive disk — the macOS default — that \
+                        is one folder, holding both rules' subfolders.
+                        """),
                     isBlocking: false))
             case .hiddenName:
                 messages.append(RuleMessage(
@@ -252,6 +293,9 @@ private struct CategoryRow: View {
     @Binding var category: Category
     let messages: [RuleMessage]
     let position: RowPosition
+    /// Bumped by the pane whenever the draft is committed or replaced, which is
+    /// the moment the field has to stop showing a draft spelling.
+    let tidyToken: Int
     let move: (Int) -> Void
     let remove: () -> Void
 
@@ -264,10 +308,16 @@ private struct CategoryRow: View {
     /// user's; the list is derived from it.
     @State private var typedExtensions: String
 
+    /// Whether the field has the keyboard. Losing it is the ordinary end of an
+    /// edit — far more common than pressing Return — and so the ordinary moment
+    /// to show what was stored.
+    @FocusState private var isEditingExtensions: Bool
+
     init(
         category: Binding<Category>,
         messages: [RuleMessage],
         position: RowPosition,
+        tidyToken: Int,
         move: @escaping (Int) -> Void,
         remove: @escaping () -> Void
     ) {
@@ -275,8 +325,53 @@ private struct CategoryRow: View {
         _typedExtensions = State(initialValue: category.wrappedValue.extensionsField)
         self.messages = messages
         self.position = position
+        self.tidyToken = tidyToken
         self.move = move
         self.remove = remove
+    }
+
+    /// What parsing changed that the user could not have predicted, said out
+    /// loud instead of only being applied.
+    ///
+    /// Shown while the field still holds the original spelling, and gone by
+    /// itself once `tidy()` has replaced it — so the sequence a user sees is
+    /// "here is why", then "here is the result", rather than a silent swap.
+    private var rewriteNotes: [RuleMessage] {
+        let rewrites = Category.extensionRewrites(in: typedExtensions)
+        guard !rewrites.isEmpty else { return [] }
+
+        var notes: [RuleMessage] = []
+        let kept = rewrites.compactMap { rewrite in
+            rewrite.stored.map { "“\(rewrite.typed)” → “\($0)”" }
+        }
+        let dropped = rewrites.filter { $0.stored == nil }.map { "“\($0.typed)”" }
+
+        if !kept.isEmpty {
+            let list = kept.formatted(.list(type: .and))
+            notes.append(RuleMessage(
+                text: String(localized: """
+                    Stored as \(list) — a rule matches only the part after the last dot.
+                    """),
+                isBlocking: false))
+        }
+        if !dropped.isEmpty {
+            let list = dropped.formatted(.list(type: .and))
+            notes.append(RuleMessage(
+                text: String(localized: """
+                    Not stored: \(list) — a file extension can't contain “/” or “:”.
+                    """),
+                isBlocking: false))
+        }
+        return notes
+    }
+
+    /// Replaces the typed text with what is actually stored.
+    ///
+    /// Called when the edit ends, not while it runs: mid-typing this would eat
+    /// the space or comma being typed.
+    private func tidy() {
+        let stored = category.extensionsField
+        if typedExtensions != stored { typedExtensions = stored }
     }
 
     var body: some View {
@@ -289,10 +384,10 @@ private struct CategoryRow: View {
                 TextField("Extensions", text: $typedExtensions)
                     .textFieldStyle(.roundedBorder)
                     .font(.caption.monospaced())
-                    // Pressing Return tidies the field to what was actually
-                    // stored, so the user can see that ".PNG, png" became one
-                    // lowercase entry rather than having to trust it.
-                    .onSubmit { typedExtensions = category.extensionsField }
+                    .focused($isEditingExtensions)
+                    .onSubmit(tidy)
+
+                MessageList(messages: rewriteNotes)
 
                 HStack(spacing: 6) {
                     Text("Subfolders")
@@ -330,13 +425,28 @@ private struct CategoryRow: View {
             let parsed = Category.parseExtensions(text)
             if parsed != category.extensions { category.extensions = parsed }
         }
-        // …and the field follows the list when something other than typing
-        // changes it — Reset to Defaults and Discard Changes both do, and the
-        // row survives them when the category keeps its identity.
+        // The field follows the list when something other than typing changes
+        // it — Reset to Defaults and Discard Changes both do, and the row
+        // survives them when the category keeps its identity.
+        //
+        // This guard alone is not enough to keep the field honest, which is the
+        // bug it used to hide: `.tar.gz` parses to `gz`, so the list and the
+        // parse of the text agree, and nothing here fires while the field goes
+        // on displaying `.tar.gz`. The two triggers below are what close it.
         .onChange(of: category.extensions) { _, list in
             if list != Category.parseExtensions(typedExtensions) {
                 typedExtensions = list.joined(separator: " ")
             }
         }
+        // Leaving the field ends the edit, so the field stops showing a
+        // spelling that is not what got stored.
+        .onChange(of: isEditingExtensions) { _, editing in
+            if !editing { tidy() }
+        }
+        // …and so does a save, a reset or a discard. Clicking a button on
+        // macOS does not necessarily take first responder away from a text
+        // field, so focus alone would leave `.tar.gz` on screen after the very
+        // save that stored `gz`.
+        .onChange(of: tidyToken) { _, _ in tidy() }
     }
 }

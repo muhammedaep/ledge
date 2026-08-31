@@ -188,7 +188,25 @@ final class AppState {
 
     // MARK: - Rules and projects
 
+    /// Commits a rule set, refusing one that would file downloads somewhere the
+    /// user did not choose.
+    ///
+    /// The rules pane disables Save on the same condition, so today this guard
+    /// never fires. It is here because the gate has to live at the boundary and
+    /// not only on the button: a category name is appended to a URL as one path
+    /// component, and an empty one files every match back into the folder it
+    /// came from while `..` files into the parent — silently, in the background,
+    /// on every download from then on. A second caller added later inherits a
+    /// disabled button not at all.
+    ///
+    /// `RuleSet.canBeSaved` is the same rule the pane reads, from LedgeCore,
+    /// where it is tested. Only names block; a duplicate or a shadowed
+    /// extension is a state a user can legitimately mean.
     func updateRules(_ newRules: RuleSet) {
+        guard newRules.canBeSaved else {
+            lastError = String(localized: "Those rules weren't saved — every category needs a folder name.")
+            return
+        }
         rules = newRules
         try? rulesStore.save(newRules)
     }
