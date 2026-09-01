@@ -56,9 +56,16 @@ public struct DownloadSettler: Sendable {
         return inProgressExtensions.contains(url.pathExtension.lowercased())
     }
 
+    /// `FileEntry.exists`, not `fileExists`. This is handed a *download* URL,
+    /// not a folder, so it asks the question `FileEntry` owns — and asking it
+    /// the resolving way meant a dangling symlink arriving in a watched folder
+    /// answered `.ignored` and was never filed at all. That is the same
+    /// permanently-unfileable class `FileMover`, `UndoService` and the shelf
+    /// were moved off `fileExists` to close; this was the one call site on a
+    /// user file that the sweep passed over.
     public func settle(_ url: URL) async -> SettleResult {
         guard !Self.isIgnored(url),
-              FileManager.default.fileExists(atPath: url.path)
+              FileEntry.exists(atPath: url.path)
         else { return .ignored }
 
         // Checked before each sleep, not after, so a settle that is still
@@ -76,7 +83,9 @@ public struct DownloadSettler: Sendable {
             // `deadline`, instead of stopping when its caller stops caring.
             if Task.isCancelled { return .cancelled }
 
-            guard FileManager.default.fileExists(atPath: url.path) else { return .ignored }
+            // Same question, same answer, as the guard on the way in — a
+            // download replaced by a link between two samples has not gone.
+            guard FileEntry.exists(atPath: url.path) else { return .ignored }
             let current = sizeProvider(url)
 
             if current == previous {

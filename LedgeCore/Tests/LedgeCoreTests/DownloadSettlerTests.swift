@@ -432,3 +432,57 @@ func aContendedFileIsReportedStillWritingNotReady() async throws {
     #expect(result == .ignored)
     #expect(elapsed < .milliseconds(50), "a file that never existed must be caught before the sampling loop, not inside it")
 }
+
+/// A dangling symlink landing in a watched folder is a file the user can see
+/// and the mover can move, and `settle` was calling it `.ignored`.
+///
+/// `settle` is handed a *download* URL, not a directory, so the `fileExists`
+/// here was the one remaining instance of the question `FileEntry` exists to
+/// answer — and the one place the sweep across the rest of the app missed. The
+/// consequence is the class this project spent three rounds closing everywhere
+/// else: an item that is silently never filed, with nothing reported.
+@Test func aDanglingSymlinkSettlesRatherThanBeingIgnored() async throws {
+    let temp = try TempDirectory()
+    let link = try temp.makeSymlink("report.pdf", to: "/nonexistent/target")
+    let settler = DownloadSettler(sampleInterval: .milliseconds(10), ceiling: .seconds(2))
+
+    #expect(await settler.settle(link) == .ready)
+}
+
+/// The guard still has to catch a path with nothing at it at all — and catch it
+/// on the way *in*.
+///
+/// The timing is the assertion that makes this test worth having. Without the
+/// entry guard the mid-loop one still returns `.ignored`, just a full
+/// `sampleInterval` later, so an outcome-only expectation passes either way and
+/// pins nothing. Asserting it returns before the first sleep is what
+/// distinguishes the two guards.
+@Test func aPathWithNoEntryAtAllIsIgnoredWithoutSampling() async throws {
+    let temp = try TempDirectory()
+    let ghost = temp.url.appendingPathComponent("never-existed.pdf")
+    let settler = DownloadSettler(sampleInterval: .seconds(1), ceiling: .seconds(5))
+
+    let start = ContinuousClock.now
+    let result = await settler.settle(ghost)
+    let elapsed = start.duration(to: ContinuousClock.now)
+
+    #expect(result == .ignored)
+    #expect(elapsed < .milliseconds(500), "it must not have waited for a sample")
+}
+
+/// The mid-loop guard, which is a separate call site with the same defect: a
+/// download replaced by a dangling link between two samples must not vanish
+/// from the pipeline.
+@Test func aFileReplacedByADanglingSymlinkMidSettleIsNotIgnored() async throws {
+    let temp = try TempDirectory()
+    let file = try temp.writeFile("report.pdf", contents: "partial")
+    let settler = DownloadSettler(sampleInterval: .milliseconds(50), ceiling: .seconds(3))
+
+    async let outcome = settler.settle(file)
+    try await Task.sleep(for: .milliseconds(20))
+    try FileManager.default.removeItem(at: file)
+    try FileManager.default.createSymbolicLink(
+        atPath: file.path, withDestinationPath: "/nonexistent/target")
+
+    #expect(await outcome != .ignored)
+}

@@ -81,9 +81,15 @@ public enum FolderAccess: Equatable, Sendable {
     /// folder answers true here and then fails the listing, while a missing one
     /// fails at the first step.
     ///
-    /// This does real I/O — a listing, which is `O(entries)`, and on an
-    /// unmounted volume blocks for the mount timeout. Never call it on the main
-    /// actor.
+    /// This does real I/O — a listing, which is `O(entries)` — and against a
+    /// network volume that has stopped answering it blocks until the mount times
+    /// out. Never call it on the main actor.
+    ///
+    /// Deliberately not claimed for a detached *local* volume, which measures at
+    /// 0.0023 s. For that case the off-main-actor rule is precautionary, and
+    /// cheap enough to keep on that basis — but stated the old way it was a
+    /// justification anyone could disprove in half a minute, which is an
+    /// invitation to ignore it.
     public static func of(_ folder: URL, using fileManager: FileManager = .default) -> FolderAccess {
         var isDirectory: ObjCBool = false
         guard fileManager.fileExists(atPath: folder.path, isDirectory: &isDirectory),
