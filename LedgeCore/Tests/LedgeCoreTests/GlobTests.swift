@@ -49,6 +49,19 @@ import Testing
     #expect(Glob.matches(pattern: "*", name: "anything at all.png"))
 }
 
+@Test func foldingIsLocaleIndependentForTheTurkishDottedI() {
+    // Pins the spec's decision (§2): `matches` folds case with `lowercased()`,
+    // not `lowercased(with: Locale.current)`. Under a Turkish locale the
+    // latter maps `I` to `ı`, not `i`, so a pattern written on a Turkish Mac
+    // would stop matching the same file on an English one. Every other test
+    // in this file passes under both foldings — measured by mutating this
+    // line to `lowercased(with: Locale.current)` and watching all ten stay
+    // green — because none of their fixtures cross the letter Turkish treats
+    // differently. This one does: `IMG*`'s `I` only matches `img_0001.heic`'s
+    // `i` if the fold is locale-independent.
+    #expect(Glob.matches(pattern: "IMG*", name: "img_0001.heic"))
+}
+
 @Test func aLiteralStarInANameIsNotMatchableExactly() {
     // Documented limit (spec §2): there is no escaping, so `*` in a pattern is
     // always the metacharacter. This test pins the limit down rather than
