@@ -13,10 +13,10 @@ private typealias Category = LedgeCore.Category
 /// Two properties shape the whole pane.
 ///
 /// *Order is meaning.* Categories are matched top to bottom and the first one
-/// claiming a file's extension wins, so moving a row is a real edit — the same
-/// edit as retyping both rows' extension lists. It therefore gets explicit
-/// buttons rather than only a drag: a drag that is hard to land is a change the
-/// user cannot make.
+/// that claims a file wins, by extension or by name pattern, so moving a row
+/// is a real edit — the same edit as retyping both rows' conditions. It
+/// therefore gets explicit buttons rather than only a drag: a drag that is
+/// hard to land is a change the user cannot make.
 ///
 /// *Saving is a commit.* Everything here edits a draft. Nothing files against a
 /// half-typed extension list, and nothing is written until Save — which is also
@@ -74,7 +74,7 @@ struct RulesPane: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text("Categories are matched top to bottom. The first one claiming a file's extension wins.")
+            Text("Categories are matched top to bottom. The first one that claims a file wins.")
             Text("Renaming a category doesn't move files that were already filed under the old name.")
         }
         .font(.caption)

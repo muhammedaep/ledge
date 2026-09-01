@@ -1,6 +1,6 @@
 import Foundation
 
-/// An ordered list of categories. The first category claiming an extension wins,
+/// An ordered list of categories. The first category that claims a file wins,
 /// which is what makes the order user-editable and meaningful.
 public struct RuleSet: Codable, Equatable, Sendable {
     public var categories: [Category]

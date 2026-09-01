@@ -209,18 +209,12 @@
         }
       }
     },
-    "Categories are matched top to bottom. The first one claiming a file's extension wins.": {
+    "Categories are matched top to bottom. The first one that claims a file wins.": {
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Categories are matched top to bottom. The first one claiming a file's extension wins."
-          }
-        },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kategoriler yukarıdan aşağıya sırayla denenir. Bir uzantıyı ilk alan kategori kazanır."
+            "value": "Kategoriler yukarıdan aşağıya denenir. Bir dosyayı ilk sahiplenen kural kazanır."
           }
         }
       }
