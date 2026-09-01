@@ -182,6 +182,15 @@ is a thin SwiftUI layer over it. That split is why the interesting behaviour is
 testable without launching an app or touching a real Downloads folder; every
 test that hits the filesystem works in its own temporary directory.
 
+## Before a release
+
+`docs/manual-checks.md` is a ten-minute list of things only a person with a pointer
+can confirm — the drag-out, undo, project routing, and that ejecting a drive does
+not lock you out of the app. None of it can be automated.
+
+`docs/known-limitations.md` records what was deliberately left, and why, while the
+reasons were still legible.
+
 ## Contributing
 
 Rule suggestions are especially welcome. If Ledge files something into the wrong
