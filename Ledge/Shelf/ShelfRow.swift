@@ -28,9 +28,55 @@ struct ShelfRow: View {
     let icon: NSImage?
     let onUndo: () -> Void
 
-    private var relativeFolder: String {
-        record.to.deletingLastPathComponent().lastPathComponent
+    @State private var isHovered = false
+
+    /// Where the file went, read as a trail rather than a single folder name.
+    ///
+    /// `relativeFolder` used to be `to.deletingLastPathComponent().lastPathComponent`,
+    /// which for `Downloads/Images/PNG/x.png` said only "PNG" — the least
+    /// informative half of the answer, and ambiguous the moment two categories
+    /// both subdivide by extension. `record.from` is the folder the file was
+    /// found in, so the components below it are exactly the trail Ledge chose.
+    ///
+    /// Project mode files *outside* `from` on purpose (spec §13), so the prefix
+    /// check fails there and the last component is used. That is a fallback,
+    /// not a bug: the destination header already names the project.
+    private var destinationTrail: String {
+        let folder = record.to.deletingLastPathComponent().standardizedFileURL
+        let root = record.from.standardizedFileURL
+        let parts = folder.pathComponents
+        let rootParts = root.pathComponents
+        guard parts.count > rootParts.count,
+              Array(parts.prefix(rootParts.count)) == rootParts
+        else { return folder.lastPathComponent }
+        return parts.dropFirst(rootParts.count).joined(separator: " · ")
     }
+
+    /// When the file was filed.
+    ///
+    /// Not `Text(_:format: .relative(presentation: .numeric))`, which is what
+    /// this was: a record seconds old renders as **"in 0 seconds"** — the wrong
+    /// unit, rounded to zero, and pointing into the future. Seen on the first
+    /// real run, on every fresh row.
+    ///
+    /// Anything under a minute is "now", which is both true and the only phrase
+    /// that does not go stale while it is being read. Above that the formatter
+    /// has a unit worth naming.
+    ///
+    /// Computed rather than bound, so it no longer re-renders every second for
+    /// a panel that is usually closed; the shelf recomputes when it opens,
+    /// which is the only moment anyone can see it.
+    private var filedWhen: String {
+        let age = Date.now.timeIntervalSince(record.date)
+        guard age >= 60 else { return String(localized: "now") }
+        return Self.relative.localizedString(for: record.date, relativeTo: .now)
+    }
+
+    private static let relative: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
 
     /// Whether the file is there *now*, re-read at gesture time rather than
     /// trusted from `isPresent`, which may be a sweep out of date.
@@ -60,34 +106,56 @@ struct ShelfRow: View {
     var body: some View {
         HStack(spacing: 10) {
             fileIcon
-                .frame(width: 28, height: 28)
+                .frame(width: 32, height: 32)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(record.originalName)
+                    .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(isPresent ? relativeFolder : String(localized: "Moved or deleted"))
+                    // A stale row's *name* is struck through, not its whole
+                    // body: the name is the part that no longer points at
+                    // anything, and striking the subtitle would cross out the
+                    // sentence explaining why.
+                    .strikethrough(!isPresent, color: .secondary)
+                Text(isPresent ? destinationTrail : String(localized: "Moved or deleted"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.head)
             }
 
             Spacer(minLength: 8)
 
-            Text(record.date, format: .relative(presentation: .numeric))
+            Text(filedWhen)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+                .monospacedDigit()
 
             Button(action: onUndo) {
                 Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 11, weight: .semibold))
             }
             .buttonStyle(.borderless)
             .help(String(localized: "Undo this move"))
             .disabled(!isPresent)
+            // Dimmed rather than hidden when the pointer is elsewhere. Fully
+            // hiding it would make undo undiscoverable — you cannot hover for
+            // a control you do not know is there — and would take it away from
+            // anyone driving the app without a pointer.
+            .opacity(isHovered ? 1 : 0.4)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
         .padding(.horizontal, 8)
+        .background {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color.primary.opacity(isHovered ? 0.08 : 0))
+        }
+        .padding(.horizontal, 6)
         .contentShape(Rectangle())
-        .opacity(isPresent ? 1 : 0.45)
+        .opacity(isPresent ? 1 : 0.5)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.12), value: isHovered)
         .onDrag {
             guard isStillThere() else { return NSItemProvider() }
             // Optional in signature only. The empty provider is not a second
@@ -108,10 +176,12 @@ struct ShelfRow: View {
         if let icon {
             Image(nsImage: icon)
                 .resizable()
+                .scaledToFit()
         } else {
             Image(systemName: "doc")
                 .resizable()
                 .scaledToFit()
+                .padding(4)
                 .foregroundStyle(.secondary)
         }
     }

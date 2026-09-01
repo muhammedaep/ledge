@@ -481,6 +481,22 @@
         }
       }
     },
+    "FILING INTO": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filing into:"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ŞURAYA KLASÖRLENİYOR"
+          }
+        }
+      }
+    },
     "File downloads automatically": {
       "localizations": {
         "en": {
@@ -493,22 +509,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "İndirilenleri otomatik klasörle"
-          }
-        }
-      }
-    },
-    "Filing into:": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filing into:"
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Şuraya klasörleniyor:"
           }
         }
       }
@@ -1085,7 +1085,7 @@
         }
       }
     },
-    "Recent Downloads": {
+    "RECENT DOWNLOADS": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -1096,7 +1096,7 @@
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Son İndirilenler"
+            "value": "SON İNDİRİLENLER"
           }
         }
       }
@@ -1449,6 +1449,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ledge'in indirilenleri klasörleyebilmesi için macOS'un izni gerekiyor. O klasöre erişim verip bu menüyü yeniden açın."
+          }
+        }
+      }
+    },
+    "now": {
+      "comment": "How recently a download was filed, for anything under a minute old.",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "şimdi"
           }
         }
       }

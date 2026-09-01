@@ -77,7 +77,10 @@ struct ShelfView: View {
             undoShortcut
         }
         .frame(width: 360)
-        .background(WindowReader { shelfWindow = $0 })
+        .background(WindowReader { window in
+            shelfWindow = window
+            configure(window)
+        })
         .sheet(isPresented: $showingOrganize) {
             OrganizeSheet()
                 .environment(state)
@@ -129,6 +132,29 @@ struct ShelfView: View {
         }
     }
 
+    /// Stops the panel closing itself on every single click.
+    ///
+    /// `MenuBarExtra(style: .window)` presents its content in an `NSPanel`.
+    /// Ledge is an accessory app (`LSUIElement`), so it is never the active
+    /// application while that panel is open — and an `NSPanel` hides itself the
+    /// moment its app is not active. The click is delivered first, so the
+    /// action happens; the shelf just vanishes underneath it. Anything needing
+    /// two clicks — pick a destination, then undo a row — meant opening the
+    /// shelf twice. Reported from the first real run.
+    ///
+    /// Deliberately *not* fixed by calling `NSApp.activate`. That would work,
+    /// and it would also pull focus off whatever app is in front every time the
+    /// shelf opens — in an app whose entire purpose is dragging a file into
+    /// that other app.
+    private func configure(_ window: NSWindow?) {
+        guard let panel = window as? NSPanel else { return }
+        panel.hidesOnDeactivate = false
+        // A panel that takes key status "only if needed" hands it straight back
+        // after a click on a control that does not need it, which is the same
+        // dismissal by a second route.
+        panel.becomesKeyOnlyIfNeeded = false
+    }
+
     /// Whether the whole list is replaced by the explanation.
     ///
     /// Only when nothing is coming in from anywhere *and* permission is the
@@ -143,8 +169,8 @@ struct ShelfView: View {
         VStack(alignment: .leading, spacing: 0) {
             destinationHeader
 
-            Text("Recent Downloads")
-                .font(.headline)
+            Text("RECENT DOWNLOADS")
+                .sectionLabel()
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
                 .padding(.bottom, 8)
@@ -339,9 +365,8 @@ struct ShelfView: View {
     /// which folder the next download will land in.
     private var destinationHeader: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("Filing into:")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text("FILING INTO")
+                .sectionLabel()
             Menu {
                 Button {
                     state.setActiveProject(nil)
@@ -410,5 +435,23 @@ struct ShelfView: View {
         // destination with no explanation.
         guard choice.wasAlreadyKnown || state.updateProjects(choice.projects) else { return }
         state.setActiveProject(choice.project)
+    }
+}
+
+extension View {
+    /// The small, quiet label naming a block of the shelf.
+    ///
+    /// The uppercasing lives in the string catalog rather than in
+    /// `.textCase(.uppercase)`, which uppercases with the non-localised
+    /// `String.uppercased()`. Measured on 2026-09-01: that turns Turkish
+    /// "Son İndirilenler" into "SON İNDIRILENLER" — a dotless I in a language
+    /// that distinguishes the two letters. `uppercased(with: Locale(identifier:
+    /// "tr"))` gets it right, but SwiftUI does not call that one, and a view
+    /// modifier is the wrong place to be choosing a locale anyway.
+    func sectionLabel() -> some View {
+        self
+            .font(.system(size: 10, weight: .semibold))
+            .tracking(0.5)
+            .foregroundStyle(.tertiary)
     }
 }
