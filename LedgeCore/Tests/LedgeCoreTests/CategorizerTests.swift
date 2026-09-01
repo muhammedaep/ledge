@@ -147,3 +147,60 @@ func anyPackageDirectoryMatchesWhenARuleClaimsItsExtension(ext: String) {
     let result = Categorizer.destination(for: facts("mystery.xyz"), in: root, using: rules)
     #expect(result.folder == root.appendingPathComponent("Other"))
 }
+
+@Test func aPatternRuleAboveAnExtensionRuleWins() {
+    let rules = RuleSet(categories: [
+        Category(name: "Screenshots", extensions: [], namePatterns: ["CleanShot *"]),
+        Category(name: "Images", extensions: ["png"])
+    ])
+    let shot = facts("CleanShot 2026-09-01 at 11.14.08@2x.png")
+    #expect(Categorizer.destination(for: shot, in: root, using: rules).category == "Screenshots")
+}
+
+@Test func theSameRuleBelowLosesToTheExtensionRule() {
+    // Order is the only precedence (spec §3). This is what makes placement
+    // load-bearing, and it is why the migration in RuleSet inserts above the
+    // png claimant rather than appending.
+    let rules = RuleSet(categories: [
+        Category(name: "Images", extensions: ["png"]),
+        Category(name: "Screenshots", extensions: [], namePatterns: ["CleanShot *"])
+    ])
+    let shot = facts("CleanShot 2026-09-01 at 11.14.08@2x.png")
+    #expect(Categorizer.destination(for: shot, in: root, using: rules).category == "Images")
+}
+
+@Test func aPatternRuleClaimsAFileWithNoExtension() {
+    let rules = RuleSet(categories: [
+        Category(name: "Notes", extensions: [], namePatterns: ["README*"])
+    ])
+    #expect(Categorizer.destination(for: facts("README"), in: root, using: rules).category == "Notes")
+}
+
+@Test func subdivisionByExtensionIsSkippedWhenThereIsNoExtension() {
+    // Otherwise the destination is a folder whose name is the empty string.
+    let rules = RuleSet(categories: [
+        Category(name: "Notes", extensions: [], namePatterns: ["README*"],
+                 subdivision: .byExtension)
+    ])
+    let result = Categorizer.destination(for: facts("README"), in: root, using: rules)
+    #expect(result.folder == root.appendingPathComponent("Notes"))
+}
+
+@Test func subdivisionByExtensionStillAppliesWhenThereIsOne() {
+    let rules = RuleSet(categories: [
+        Category(name: "Screenshots", extensions: [], namePatterns: ["CleanShot *"],
+                 subdivision: .byExtension)
+    ])
+    let result = Categorizer.destination(for: facts("CleanShot 1.png"), in: root, using: rules)
+    #expect(result.folder == root.appendingPathComponent("Screenshots").appendingPathComponent("PNG"))
+}
+
+@Test func aPlainFolderNamedLikeAPatternIsStillNotFiled() {
+    // The directory guard predates patterns and must survive them: a folder
+    // called "CleanShot archive" is a folder, not a screenshot.
+    let rules = RuleSet(categories: [
+        Category(name: "Screenshots", extensions: [], namePatterns: ["CleanShot *"])
+    ])
+    let folder = facts("CleanShot archive", isDirectory: true)
+    #expect(Categorizer.destination(for: folder, in: root, using: rules).category == rules.fallbackName)
+}
