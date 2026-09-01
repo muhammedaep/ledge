@@ -115,6 +115,16 @@ final class AppState {
         // marker is never rewritten — and a save that fails leaves the marker
         // unrecorded, which means the migration is offered again rather than
         // silently lost.
+        //
+        // `rules` above is already `RulesStore.load()`'s return, which is
+        // `sanitized()` — a hand-edited file with an unusable category comes
+        // back repaired in memory. Before this migration existed, nothing
+        // wrote that back, so a bad file kept the user's own text until they
+        // next touched Settings. `save(migrated)` below persists whatever is
+        // in memory, so the repair now reaches disk too, as a side effect of
+        // saving at all — not something this migration set out to do, and not
+        // worth a guard against: there is no unsanitized copy left to save
+        // instead, only the raw file this class no longer holds.
         let migrated = rules.migrated()
         if migrated != rules {
             do {
