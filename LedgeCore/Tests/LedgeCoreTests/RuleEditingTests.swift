@@ -497,3 +497,36 @@ import Foundation
     #expect(repaired.fallbackName == "Other")
     #expect(try repaired.validated() == repaired)
 }
+
+// MARK: - Parsing the patterns field
+
+@Test func patternsAreSeparatedByNewlinesNotSpaces() {
+    // The extensions field splits on whitespace. A pattern contains spaces —
+    // "CleanShot *" — and splitting it the same way would store two patterns,
+    // the second of which is `*` and claims every file in the folder.
+    let parsed = Category.parseNamePatterns("CleanShot *\nScreenshot *")
+    #expect(parsed == ["CleanShot *", "Screenshot *"])
+}
+
+@Test func aPatternMayContainACommaOrASpace() {
+    #expect(Category.parseNamePatterns("invoice, final*.pdf") == ["invoice, final*.pdf"])
+}
+
+@Test func blankAndWhitespaceOnlyLinesAreDropped() {
+    #expect(Category.parseNamePatterns("\n  \nCleanShot *\n\n   ") == ["CleanShot *"])
+}
+
+@Test func duplicatePatternsCollapseKeepingFirstPosition() {
+    #expect(Category.parseNamePatterns("b*\na*\nb*") == ["b*", "a*"])
+}
+
+@Test func patternsAreStoredAsTyped() {
+    // Unlike extensions, which are lowercased on the way in.
+    #expect(Category.parseNamePatterns("CleanShot *") == ["CleanShot *"])
+}
+
+@Test func thePatternsFieldRoundTrips() {
+    let category = Category(name: "Screenshots", extensions: [],
+                            namePatterns: ["CleanShot *", "Screenshot *"])
+    #expect(Category.parseNamePatterns(category.namePatternsField) == category.namePatterns)
+}

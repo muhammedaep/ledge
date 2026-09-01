@@ -10,6 +10,12 @@ public extension Category {
     /// without ever changing what it means.
     var extensionsField: String { extensions.joined(separator: " ") }
 
+    /// The stored patterns as the text the editor shows, one per line.
+    ///
+    /// The inverse of `parseNamePatterns`, so feeding this back through it
+    /// returns the same list.
+    var namePatternsField: String { namePatterns.joined(separator: "\n") }
+
     /// Turns a typed or pasted extensions field into the list to store.
     ///
     /// This is a rule about what an extension *is*, not a formatting
@@ -49,6 +55,32 @@ public extension Category {
         let ext = String(last)
         guard !ext.contains("/"), !ext.contains(":"), !ext.contains("\0") else { return nil }
         return ext
+    }
+
+    /// Turns a typed or pasted patterns field into the list to store.
+    ///
+    /// One pattern per line, and the separator is not negotiable: the
+    /// extensions field splits on commas or whitespace, and a pattern contains
+    /// spaces — `CleanShot *` split that way stores two patterns, the second
+    /// being `*`, which claims every file in the folder. A filename may contain
+    /// a comma too. A newline is the only separator a filename cannot contain.
+    ///
+    /// Patterns are stored as typed. `parseExtensions` lowercases because
+    /// `Categorizer` compares against a lowercase `pathExtension`; `Glob` folds
+    /// case at match time instead, so folding here would only show the user
+    /// something they did not write.
+    ///
+    /// Duplicates within the field collapse, keeping first position, as the
+    /// extensions field does.
+    static func parseNamePatterns(_ text: String) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+        for line in text.split(whereSeparator: \.isNewline) {
+            let pattern = line.trimmingCharacters(in: .whitespaces)
+            guard !pattern.isEmpty, seen.insert(pattern).inserted else { continue }
+            result.append(pattern)
+        }
+        return result
     }
 }
 
