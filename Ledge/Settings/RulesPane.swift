@@ -328,6 +328,10 @@ private struct CategoryRow: View {
     /// user's; the list is derived from it.
     @State private var typedExtensions: String
 
+    /// The name-patterns field as typed, kept separate from the parsed list —
+    /// same reason as `typedExtensions`.
+    @State private var typedPatterns: String
+
     /// Whether the field has the keyboard. Losing it is the ordinary end of an
     /// edit — far more common than pressing Return — and so the ordinary moment
     /// to show what was stored.
@@ -343,6 +347,7 @@ private struct CategoryRow: View {
     ) {
         _category = category
         _typedExtensions = State(initialValue: category.wrappedValue.extensionsField)
+        _typedPatterns = State(initialValue: category.wrappedValue.namePatternsField)
         self.messages = messages
         self.position = position
         self.tidyToken = tidyToken
@@ -415,6 +420,26 @@ private struct CategoryRow: View {
 
                 MessageList(messages: rewriteNotes)
 
+                // A TextEditor rather than TextField(axis: .vertical): on macOS
+                // Return in a vertical TextField submits rather than inserting a
+                // newline, and a newline is this field's separator (see
+                // `Category.parseNamePatterns`). A control the user cannot type
+                // the separator into is not a control.
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Name patterns — one per line, * matches anything")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    TextEditor(text: $typedPatterns)
+                        .font(.caption.monospaced())
+                        .scrollContentBackground(.hidden)
+                        .frame(height: 46)
+                        .padding(4)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 5)
+                                .strokeBorder(.separator)
+                        }
+                }
+
                 HStack(spacing: 6) {
                     Text("Subfolders")
                         .font(.caption)
@@ -450,6 +475,17 @@ private struct CategoryRow: View {
         .onChange(of: typedExtensions) { _, text in
             let parsed = Category.parseExtensions(text)
             if parsed != category.extensions { category.extensions = parsed }
+        }
+        .onChange(of: typedPatterns) { _, text in
+            let parsed = Category.parseNamePatterns(text)
+            if parsed != category.namePatterns { category.namePatterns = parsed }
+        }
+        // Follows the list when something other than typing changes it —
+        // Reset to Defaults and Discard Changes both do.
+        .onChange(of: category.namePatterns) { _, list in
+            if list != Category.parseNamePatterns(typedPatterns) {
+                typedPatterns = list.joined(separator: "\n")
+            }
         }
         // The field follows the list when something other than typing changes
         // it — Reset to Defaults and Discard Changes both do, and the row

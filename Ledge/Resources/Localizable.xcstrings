@@ -841,6 +841,16 @@
         }
       }
     },
+    "Name patterns — one per line, * matches anything": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ad desenleri — satır başına bir tane, * her şeyi karşılar"
+          }
+        }
+      }
+    },
     "New Category": {
       "localizations": {
         "en": {
