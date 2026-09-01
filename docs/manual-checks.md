@@ -142,7 +142,14 @@ and Folders, then reopen the shelf.
 You should get a screen that says what is wrong and offers a route to fix it —
 along with Settings and Quit, which must never disappear.
 
-## 10. What could not be established here at all
+## 10. Screenshots get their own folder
+
+Take a screenshot into a watched folder. It should land in `Screenshots/`, not
+`Images/`. Open Settings → Rules: the Screenshots rule is there, above Images,
+with its patterns visible and editable. Delete it, quit, relaunch — it must
+stay deleted.
+
+## 11. What could not be established here at all
 
 - Whether the menu bar panel notices access being **revoked while it is closed**.
   It is the only signal that catches that case, and no agent could test it.

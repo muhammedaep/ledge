@@ -152,7 +152,14 @@ System Settings → Privacy & Security → Files and Folders altından Ledge'in
 Neyin yanlış olduğunu söyleyen ve düzeltme yolu sunan bir ekran görmelisin — yanında
 **Settings** (Ayarlar) ve **Quit** (Çık) ile birlikte, ki bunlar asla kaybolmamalı.
 
-## 10. Burada hiç doğrulanamayanlar
+## 10. Ekran görüntüleri kendi klasörüne düşüyor
+
+İzlenen bir klasöre ekran görüntüsü al. `Screenshots/` içine düşmeli,
+`Images/` içine değil. Ayarlar → Kurallar'ı aç: Screenshots kuralı orada,
+Images'ın üstünde, desenleri görünür ve düzenlenebilir halde. Sil, çık,
+yeniden başlat — silinmiş kalmalı.
+
+## 11. Burada hiç doğrulanamayanlar
 
 - Menü çubuğu panelinin, erişim **kapalıyken kaldırıldığında** bunu fark edip
   etmediği. Bu durumu yakalayan tek sinyal odur ve hiçbir ajan test edemedi.
