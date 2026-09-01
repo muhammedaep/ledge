@@ -15,6 +15,14 @@ open Ledge.xcodeproj      # ⌘R
 
 The app has no Dock icon. Look for a tray icon in the menu bar.
 
+If macOS says **Not enough room to show “Ledge”**, the menu bar is full
+and the status item was never created — the app is running, it just has nowhere
+to appear. This is common on a notched MacBook, where the notch takes the middle
+of the bar. Free a slot (⌘-drag an icon out of the bar, or turn Control Center
+modules off in System Settings → Control Center), then **relaunch Ledge** — the
+item is not retried after the failure. A menu bar manager does not help: it
+hides items rather than creating slots.
+
 macOS will ask for permission to read `~/Downloads` the first time. Allow it — if
 you decline, you should get an explanatory screen rather than an app that silently
 does nothing, and that is itself check 9.
