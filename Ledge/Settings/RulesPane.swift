@@ -337,6 +337,12 @@ private struct CategoryRow: View {
     /// to show what was stored.
     @FocusState private var isEditingExtensions: Bool
 
+    /// Same role as `isEditingExtensions`, for the patterns field. It has to
+    /// carry the whole job alone there: a `TextEditor` has no `.onSubmit`, and
+    /// giving it one anyway would mean intercepting Return — the very
+    /// character this field uses as its separator.
+    @FocusState private var isEditingPatterns: Bool
+
     init(
         category: Binding<Category>,
         messages: [RuleMessage],
@@ -405,6 +411,21 @@ private struct CategoryRow: View {
         if typedExtensions != stored { typedExtensions = stored }
     }
 
+    /// `tidy()`'s counterpart for the patterns field.
+    ///
+    /// The pull-back `onChange(of: category.namePatterns)` below cannot do
+    /// this job by itself: it fires only when the *parsed* list changes, and
+    /// typing `"CleanShot *\nCleanShot *"` or a line with trailing
+    /// whitespace parses to a list that already matches what is stored, so
+    /// the guard never fires and the field would go on showing the
+    /// duplicate/untrimmed text — through Save, through losing focus —
+    /// until something unrelated happened to change the list. Same shape as
+    /// the `.tar.gz` case `tidy()` exists for.
+    private func tidyPatterns() {
+        let stored = category.namePatternsField
+        if typedPatterns != stored { typedPatterns = stored }
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 6) {
@@ -438,6 +459,7 @@ private struct CategoryRow: View {
                             RoundedRectangle(cornerRadius: 5)
                                 .strokeBorder(.separator)
                         }
+                        .focused($isEditingPatterns)
                 }
 
                 HStack(spacing: 6) {
@@ -505,10 +527,18 @@ private struct CategoryRow: View {
         .onChange(of: isEditingExtensions) { _, editing in
             if !editing { tidy() }
         }
+        // Same moment, for the patterns field — its only tidy trigger besides
+        // `tidyToken`, since a `TextEditor` has no `.onSubmit` to pair with.
+        .onChange(of: isEditingPatterns) { _, editing in
+            if !editing { tidyPatterns() }
+        }
         // …and so does a save, a reset or a discard. Clicking a button on
         // macOS does not necessarily take first responder away from a text
         // field, so focus alone would leave `.tar.gz` on screen after the very
         // save that stored `gz`.
-        .onChange(of: tidyToken) { _, _ in tidy() }
+        .onChange(of: tidyToken) { _, _ in
+            tidy()
+            tidyPatterns()
+        }
     }
 }
