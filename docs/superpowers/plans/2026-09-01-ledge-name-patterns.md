@@ -520,8 +520,12 @@ git commit -m "feat(core): categorize by name pattern as well as extension"
 
 **Files:**
 - Modify: `LedgeCore/Sources/LedgeCore/Rules/RuleSet.swift`
+- Modify: `LedgeCore/Sources/LedgeCore/Rules/RuleEditing.swift` — the diagnostic
+- Modify: `Ledge/Settings/RulesPane.swift` — one `case`, because the rename breaks it
+- Modify: `Ledge/Resources/Localizable.xcstrings` — one key swapped
 - Test: `LedgeCore/Tests/LedgeCoreTests/RuleSetMigrationTests.swift` (create)
 - Test: `LedgeCore/Tests/LedgeCoreTests/RuleSetTests.swift` (append)
+- Test: `LedgeCore/Tests/LedgeCoreTests/RuleEditingTests.swift` (append, and one existing expectation renamed)
 
 **Interfaces:**
 - Consumes: `Category.init(id:name:extensions:namePatterns:subdivision:)` from Task 2.
@@ -531,8 +535,15 @@ git commit -m "feat(core): categorize by name pattern as well as extension"
   - `RuleSet.screenshotsMigration: String` (`"screenshots-category"`)
   - `RuleSet.screenshotsCategory: Category`
   - `RuleSet.migrated() -> RuleSet`
+  - `RuleSet.Problem.noConditions(category: Category.ID)` — replaces `.noExtensions(category:)`
 
-Spec §5 and §6.
+Spec §5, §6 and §8.
+
+**Why the diagnostic is here and not with the rest of the editor work:**
+`RuleEditingTests.swift:244` asserts `RuleSet.defaults.problems.isEmpty`. The
+`Screenshots` rule added below has no extensions, which trips the existing
+`noExtensions` diagnostic — so this task would end with a red suite if the
+rename waited. It travels with the category that needs it.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -594,6 +605,19 @@ private func ruleSet(_ categories: [Category], applied: [String] = []) -> RuleSe
         Category(name: "Documents", extensions: ["pdf"])
     ])
     #expect(reordered.migrated().categories.map(\.name) == ["Screenshots", "Images", "Documents"])
+}
+
+@Test func aPatternOnlyCategoryIsNotFlaggedAsEmpty() {
+    let rules = RuleSet(categories: [
+        Category(name: "Screenshots", extensions: [], namePatterns: ["CleanShot *"])
+    ])
+    #expect(!rules.problems.contains { if case .noConditions = $0 { return true }; return false })
+}
+
+@Test func aCategoryWithNeitherExtensionsNorPatternsIsFlagged() {
+    let rules = RuleSet(categories: [Category(name: "Empty", extensions: [])])
+    #expect(rules.problems.contains { if case .noConditions = $0 { return true }; return false })
+}
 }
 
 @Test func theShippedScreenshotsRuleCatchesRealScreenshotNames() {
@@ -757,15 +781,89 @@ and change the closing of `defaults` from `])` to:
     ], appliedMigrations: [screenshotsMigration])
 ```
 
-- [ ] **Step 4: Run the whole suite**
+- [ ] **Step 4: Make the empty-category diagnostic true again**
 
-Run: `cd LedgeCore && swift test`
-Expected: PASS, with no existing test edited. Checked while writing this plan: no test counts the default categories, and the two tests that loop over their extensions (`defaultExtensionsAreLowercasedAndDotless`, `noExtensionAppearsInTwoCategories`) are unaffected because `Screenshots` has none. `ruleSetSurvivesEncodeDecode` now also exercises the `appliedMigrations` round-trip. If any existing test does fail, stop and report it rather than editing it — it is telling you something this plan got wrong.
+Three edits in the same file.
 
-- [ ] **Step 5: Prove each test can fail**
+Rename the case, keeping it beside `shadowedExtension`:
+
+```swift
+        /// The category states no conditions at all — no extensions and no
+        /// patterns — so nothing can ever match it. Renamed from
+        /// `noExtensions`, which stopped being true the moment a category could
+        /// be pattern-only: a Screenshots rule has no extensions by design, and
+        /// warning about it would mean Ledge shipping a rule and immediately
+        /// calling it a mistake.
+        case noConditions(category: Category.ID)
+```
+
+In the `category` accessor, change `case let .noExtensions(id)` to `case let .noConditions(id)`.
+
+In `problems`, change:
+
+```swift
+            if category.extensions.isEmpty {
+                found.append(.noExtensions(category: category.id))
+            }
+```
+
+to:
+
+```swift
+            if category.extensions.isEmpty && category.namePatterns.isEmpty {
+                found.append(.noConditions(category: category.id))
+            }
+```
+
+- [ ] **Step 5: Follow the rename through the app target and the one existing test**
+
+Renaming the case breaks the two places that read it, so both are fixed here —
+a commit that does not build is a commit nobody can bisect through.
+
+In `LedgeCore/Tests/LedgeCoreTests/RuleEditingTests.swift`, change the
+expectation `#expect(rules.problems == [.noExtensions(category: empty.id)])` to
+`#expect(rules.problems == [.noConditions(category: empty.id)])`. Its subject is
+unchanged — a category with nothing in it — only the case's name.
+
+In `Ledge/Settings/RulesPane.swift`, change:
+
+```swift
+            case .noExtensions:
+                messages.append(RuleMessage(
+                    text: String(localized: "No extensions, so nothing is ever filed here."),
+                    isBlocking: false))
+```
+
+to:
+
+```swift
+            case .noConditions:
+                messages.append(RuleMessage(
+                    text: String(localized: "No extensions and no patterns, so nothing is ever filed here."),
+                    isBlocking: false))
+```
+
+In `Ledge/Resources/Localizable.xcstrings`, remove the key
+`No extensions, so nothing is ever filed here.` and add
+`No extensions and no patterns, so nothing is ever filed here.` with the `tr`
+value `Uzantı da desen de yok, buraya hiçbir şey klasörlenmez.` and **no `en`
+entry** — check 3 requires any `en` value to equal its key, and omitting it
+makes the key itself the English text.
+
+- [ ] **Step 6: Run the whole gate**
+
+Run: `cd LedgeCore && swift test`, then `make build`, then `make strings`
+Expected: tests PASS (including `defaultRuleSetHasNoProblems` at
+`RuleEditingTests.swift:244`, which is the reason the diagnostic moved into
+this task), build succeeds, all three string checks OK. No test other than the
+one renamed expectation above is edited. Checked while writing this plan: no test counts the default categories, and the two tests that loop over their extensions (`defaultExtensionsAreLowercasedAndDotless`, `noExtensionAppearsInTwoCategories`) are unaffected because `Screenshots` has none. `ruleSetSurvivesEncodeDecode` now also exercises the `appliedMigrations` round-trip. If any existing test does fail, stop and report it rather than editing it — it is telling you something this plan got wrong.
+
+- [ ] **Step 7: Prove each test can fail**
 
 | Mutation | Must fail |
 |---|---|
+| `extensions.isEmpty && namePatterns.isEmpty` → `extensions.isEmpty` | `aPatternOnlyCategoryIsNotFlaggedAsEmpty`, `defaultRuleSetHasNoProblems` |
+| `extensions.isEmpty && namePatterns.isEmpty` → `false` | `aCategoryWithNeitherExtensionsNorPatternsIsFlagged` |
 | `guard !appliedMigrations.contains(...) else { return self }` → delete the line | `migrationIsANoOpOnceTheMarkerIsRecorded` |
 | `result.appliedMigrations = ...` → delete the line | `migrationRecordsItsMarker`, `migrationIsANoOpOnceTheMarkerIsRecorded` |
 | `firstIndex { $0.extensions.contains("png") } ?? 0` → `categories.count` | `screenshotsIsInsertedAboveThePngClaimant`, `defaultsPutScreenshotsAboveImages` (if defaults are rebuilt), `migrationRespectsAReorderedRuleSet` |
@@ -773,21 +871,25 @@ Expected: PASS, with no existing test edited. Checked while writing this plan: n
 | `namePatterns: ["CleanShot *", "Screenshot *", "Screen Shot *"]` → drop `"Screen Shot *"` | `theShippedScreenshotsRuleCatchesRealScreenshotNames` |
 | `decodeIfPresent(...) ?? []` → `decode(...)` in `RuleSet.init(from:)` | `aRuleSetSavedBeforePatternsExistedStillDecodes` |
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add LedgeCore/Sources/LedgeCore/Rules/RuleSet.swift LedgeCore/Tests/LedgeCoreTests/RuleSetMigrationTests.swift LedgeCore/Tests/LedgeCoreTests/RuleSetTests.swift
+git add LedgeCore/Sources/LedgeCore/Rules/RuleSet.swift \
+        LedgeCore/Sources/LedgeCore/Rules/RuleEditing.swift \
+        LedgeCore/Tests/LedgeCoreTests/RuleSetMigrationTests.swift \
+        LedgeCore/Tests/LedgeCoreTests/RuleSetTests.swift \
+        LedgeCore/Tests/LedgeCoreTests/RuleEditingTests.swift \
+        Ledge/Settings/RulesPane.swift \
+        Ledge/Resources/Localizable.xcstrings
 git commit -m "feat(core): a Screenshots rule, and a marked one-time migration to carry it"
 ```
 
 ---
 
-### Task 5: The editor's model — a patterns field, and a diagnostic that is true again
+### Task 5: The editor's model — the patterns field
 
 **Files:**
 - Modify: `LedgeCore/Sources/LedgeCore/Rules/RuleEditing.swift`
-- Modify: `Ledge/Settings/RulesPane.swift` — one `case`, because the rename breaks it
-- Modify: `Ledge/Resources/Localizable.xcstrings` — one key swapped
 - Test: `LedgeCore/Tests/LedgeCoreTests/RuleEditingTests.swift` (append)
 
 **Interfaces:**
@@ -795,9 +897,10 @@ git commit -m "feat(core): a Screenshots rule, and a marked one-time migration t
 - Produces:
   - `Category.namePatternsField: String`
   - `Category.parseNamePatterns(_ text: String) -> [String]`
-  - `RuleSet.Problem.noConditions(category: Category.ID)` — replaces `.noExtensions(category:)`
 
-Spec §7 and §8.
+Spec §7. The `noConditions` diagnostic moved to Task 4 — `RuleSet.defaults`
+gains a pattern-only category there, and the old diagnostic would have flagged
+it, so the rename had to travel with it.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -835,17 +938,6 @@ Append to `LedgeCore/Tests/LedgeCoreTests/RuleEditingTests.swift`:
     #expect(Category.parseNamePatterns(category.namePatternsField) == category.namePatterns)
 }
 
-@Test func aPatternOnlyCategoryIsNotFlaggedAsEmpty() {
-    let rules = RuleSet(categories: [
-        Category(name: "Screenshots", extensions: [], namePatterns: ["CleanShot *"])
-    ])
-    #expect(!rules.problems.contains { if case .noConditions = $0 { return true }; return false })
-}
-
-@Test func aCategoryWithNeitherExtensionsNorPatternsIsFlagged() {
-    let rules = RuleSet(categories: [Category(name: "Empty", extensions: [])])
-    #expect(rules.problems.contains { if case .noConditions = $0 { return true }; return false })
-}
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -895,77 +987,12 @@ and after `parseExtensions`, add:
     }
 ```
 
-- [ ] **Step 4: Make the empty-category diagnostic true again**
-
-Three edits in the same file.
-
-Rename the case, keeping it beside `shadowedExtension`:
-
-```swift
-        /// The category states no conditions at all — no extensions and no
-        /// patterns — so nothing can ever match it. Renamed from
-        /// `noExtensions`, which stopped being true the moment a category could
-        /// be pattern-only: a Screenshots rule has no extensions by design, and
-        /// warning about it would mean Ledge shipping a rule and immediately
-        /// calling it a mistake.
-        case noConditions(category: Category.ID)
-```
-
-In the `category` accessor, change `case let .noExtensions(id)` to `case let .noConditions(id)`.
-
-In `problems`, change:
-
-```swift
-            if category.extensions.isEmpty {
-                found.append(.noExtensions(category: category.id))
-            }
-```
-
-to:
-
-```swift
-            if category.extensions.isEmpty && category.namePatterns.isEmpty {
-                found.append(.noConditions(category: category.id))
-            }
-```
-
-- [ ] **Step 5: Follow the rename into the app target**
-
-Renaming the case breaks the one place that reads it, so it is fixed here
-rather than in the next task — a commit that does not build is a commit nobody
-can bisect through.
-
-In `Ledge/Settings/RulesPane.swift`, change:
-
-```swift
-            case .noExtensions:
-                messages.append(RuleMessage(
-                    text: String(localized: "No extensions, so nothing is ever filed here."),
-                    isBlocking: false))
-```
-
-to:
-
-```swift
-            case .noConditions:
-                messages.append(RuleMessage(
-                    text: String(localized: "No extensions and no patterns, so nothing is ever filed here."),
-                    isBlocking: false))
-```
-
-In `Ledge/Resources/Localizable.xcstrings`, remove the key
-`No extensions, so nothing is ever filed here.` and add
-`No extensions and no patterns, so nothing is ever filed here.` with the `tr`
-value `Uzantı da desen de yok, buraya hiçbir şey klasörlenmez.` and **no `en`
-entry** — check 3 requires any `en` value to equal its key, and omitting it
-makes the key itself the English text.
-
-- [ ] **Step 6: Run the whole gate**
+- [ ] **Step 4: Run the whole gate**
 
 Run: `cd LedgeCore && swift test`, then `make build`, then `make strings`
 Expected: tests PASS, build succeeds, all three string checks OK.
 
-- [ ] **Step 7: Prove each test can fail**
+- [ ] **Step 5: Prove each test can fail**
 
 | Mutation | Must fail |
 |---|---|
@@ -974,17 +1001,13 @@ Expected: tests PASS, build succeeds, all three string checks OK.
 | delete `seen.insert(pattern).inserted` from the guard | `duplicatePatternsCollapseKeepingFirstPosition` |
 | `line.trimmingCharacters(in: .whitespaces)` → `String(line)` | `blankAndWhitespaceOnlyLinesAreDropped` |
 | `namePatterns.joined(separator: "\n")` → `joined(separator: " ")` | `thePatternsFieldRoundTrips` |
-| `extensions.isEmpty && namePatterns.isEmpty` → `extensions.isEmpty` | `aPatternOnlyCategoryIsNotFlaggedAsEmpty` |
-| `extensions.isEmpty && namePatterns.isEmpty` → `false` | `aCategoryWithNeitherExtensionsNorPatternsIsFlagged` |
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add LedgeCore/Sources/LedgeCore/Rules/RuleEditing.swift \
-        LedgeCore/Tests/LedgeCoreTests/RuleEditingTests.swift \
-        Ledge/Settings/RulesPane.swift \
-        Ledge/Resources/Localizable.xcstrings
-git commit -m "feat(core): a patterns field, and an empty-rule warning that is true again"
+        LedgeCore/Tests/LedgeCoreTests/RuleEditingTests.swift
+git commit -m "feat(core): a name-patterns field for the rules editor"
 ```
 
 ---
