@@ -65,13 +65,22 @@ struct PermissionView: View {
     /// Falls back to the real name when a folder has no localization, which is
     /// every folder the user adds themselves.
     ///
-    /// The read is safe to do here, on the main actor, for the reason the rest
-    /// of this app moves filesystem work off it: that rule exists because a
-    /// record can point at an unmounted volume, where a read blocks for the
-    /// mount timeout. This view renders only for `unreadableFolders` — folders
-    /// that are present and refuse to be read. A folder that is merely gone is
-    /// classified `.missing` by the sweep that ran moments ago and gets the
-    /// shelf's banner instead, never this screen.
+    /// One `resourceValues` read, on the main actor, which is a deliberate
+    /// exception to the rule the shelf follows — and the reason is narrower than
+    /// it looks, so do not cite a detached drive for it. A *local* volume that
+    /// has gone answers immediately: measured on a force-detached sparse image,
+    /// `fileExists` returned in 0.0000 s and `icon(forFile:)` in 0.0023 s. The
+    /// case that genuinely stalls is an unresponsive *network* mount, which is
+    /// what the off-main-actor work elsewhere is really buying insurance against.
+    ///
+    /// So this is precautionary rather than provably safe. It reads one folder,
+    /// once per render of a screen that is itself rare, and only for
+    /// `unreadableFolders` — folders present enough to have refused a read
+    /// during the sweep moments ago; one that is merely gone is classified
+    /// `.missing` and gets the shelf's banner instead, never this screen. If a
+    /// watched folder ever lives on a hanging network share, this read can stall
+    /// the popover exactly as the shelf's would have, and it should move off the
+    /// main actor with them.
     private var folderName: String {
         guard let folder = blockedFolders.first else { return String(localized: "Downloads") }
         let localized = try? folder.resourceValues(forKeys: [.localizedNameKey]).localizedName
