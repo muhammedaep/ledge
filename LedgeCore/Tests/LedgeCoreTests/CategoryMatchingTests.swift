@@ -41,3 +41,14 @@ import Testing
     let shots = Category(name: "Screenshots", extensions: [], namePatterns: ["CleanShot *"])
     #expect(!shots.matches(name: "README", extension: ""))
 }
+
+@Test func anEmptyExtensionEntryDoesNotClaimAnExtensionlessFile() {
+    // A hand-edited rules.json can carry `extensions: [""]`. Before patterns
+    // existed, a guard ahead of `Category.matches` sent every extensionless
+    // file straight to the fallback, so this entry was inert no matter where
+    // it came from. That guard is gone now that a pattern-only rule needs to
+    // see extensionless files — nothing here should resurrect the old one by
+    // letting `""` claim it instead.
+    let category = Category(name: "Everything", extensions: [""])
+    #expect(!category.matches(name: "README", extension: ""))
+}

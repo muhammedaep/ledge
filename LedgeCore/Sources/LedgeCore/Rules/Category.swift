@@ -36,7 +36,16 @@ public struct Category: Codable, Identifiable, Equatable, Sendable {
     ) {
         self.id = id
         self.name = name
-        self.extensions = extensions.map { $0.lowercased() }
+        // An empty entry is dropped, not just lowercased. `Categorizer` hands
+        // `matches` an extensionless file's `pathExtension` as `""`, and
+        // before patterns existed a guard ahead of this rule sent every such
+        // file to the fallback, so `extensions: [""]` was inert wherever it
+        // came from. That guard is gone now that a pattern-only rule needs to
+        // see extensionless files, and `RuleEditing.parseExtensions` already
+        // never produces this token — but `rules.json` is user-editable, and
+        // a hand-added `""` would otherwise claim every extensionless
+        // download for whichever category listed it.
+        self.extensions = extensions.map { $0.lowercased() }.filter { !$0.isEmpty }
         self.namePatterns = namePatterns
         self.subdivision = subdivision
     }
@@ -72,7 +81,11 @@ public struct Category: Codable, Identifiable, Equatable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
-        extensions = try container.decode([String].self, forKey: .extensions).map { $0.lowercased() }
+        // Same filter as the memberwise initializer, and for the same reason:
+        // a hand-edited `rules.json` can carry `extensions: [""]`, which
+        // would otherwise claim every extensionless file.
+        extensions = try container.decode([String].self, forKey: .extensions)
+            .map { $0.lowercased() }.filter { !$0.isEmpty }
         namePatterns = try container.decodeIfPresent([String].self, forKey: .namePatterns) ?? []
         subdivision = try container.decode(Subdivision.self, forKey: .subdivision)
     }
