@@ -332,11 +332,20 @@ final class AppState {
     /// recreates it.
     private func filingRoot(for foundIn: URL) -> URL {
         guard let project = activeProject else { return foundIn }
-        // `FileEntry.isDirectory`, not `fileExists(atPath:isDirectory:)` — the
-        // same question, asked through the one place that owns it. It follows
-        // symlinks deliberately: a symlinked project folder is somewhere a
-        // download can land, and a dangling one is not, which is exactly the
-        // fallback this guard exists to take.
+        // `isDirectory`, and deliberately NOT `FileEntry.exists`.
+        //
+        // The rest of this app was moved onto `exists` (lstat) because a
+        // dangling symlink is a real entry that `FileMover` can move. Applying
+        // that uniformly here looks like tidying and is a regression: a
+        // dangling link at the project folder would pass an `exists` guard, and
+        // `FileMover.createDirectory` would then fail on it, turning this clean
+        // "the project folder is gone, filing into the watched folder instead"
+        // fallback into a per-file "Couldn't file …" for every download.
+        //
+        // The two calls answer different questions on purpose — see
+        // `FileEntry`. This one has to follow symlinks: a symlinked project
+        // folder is somewhere a download can land, and a dangling one is not,
+        // which is exactly the case this guard exists to catch.
         guard FileEntry.isDirectory(atPath: project.folder.path) else {
             preferences.activeProjectID = nil
             lastError = String(
