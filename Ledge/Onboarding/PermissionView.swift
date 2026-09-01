@@ -18,6 +18,27 @@ struct PermissionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // The headline names the folder, the list below spells it as a path,
+            // and the two can disagree — `İndirilenler` here, `/Users/…/Downloads`
+            // a few lines down. That is deliberate, not an oversight to tidy away.
+            //
+            // They answer different questions. This is a *sentence*, and in prose
+            // a folder gets the name macOS shows it by. The list is an
+            // *identifier*, there to say which folder is meant, and a path is what
+            // disambiguates. Finder makes the same split — it shows `İndirilenler`
+            // while Get Info shows the path — so the convention is already one the
+            // reader knows.
+            //
+            // Making them agree breaks one or the other: `lastPathComponent` here
+            // puts an English folder name inside a Turkish sentence, and a
+            // localized name down there stops being unambiguous.
+            //
+            // Worth knowing before adding a third place a folder is shown: this
+            // headline is the *only* spot in the app that uses the localized name.
+            // Everything else — the shelf's banner and destination header, the
+            // Organize picker, Settings — uses `lastPathComponent` or the path.
+            // Decide which register a new one belongs to rather than copying
+            // whichever line you happened to open.
             Label("Ledge can't read your \(folderName) folder", systemImage: "lock.fill")
                 .font(.headline)
 
