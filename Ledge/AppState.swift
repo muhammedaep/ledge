@@ -109,6 +109,21 @@ final class AppState {
         } else if rulesStore.lastLoadWasRepaired {
             notice = Notice(message: String(localized: "Some of your rules named a folder Ledge can't use and were removed. The rest are unchanged."))
         }
+
+        // One-time edits Ledge makes to a rule set it did not write. Saved only
+        // when something actually changed, so a rule set already carrying every
+        // marker is never rewritten — and a save that fails leaves the marker
+        // unrecorded, which means the migration is offered again rather than
+        // silently lost.
+        let migrated = rules.migrated()
+        if migrated != rules {
+            do {
+                try rulesStore.save(migrated)
+                rules = migrated
+            } catch {
+                notice = Notice(message: String(localized: "Couldn't save your rules."))
+            }
+        }
         projects = projectStore.load()
         Task { await refreshRecords() }
         Task { await refreshFolderStatus() }
