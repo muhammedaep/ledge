@@ -356,7 +356,7 @@ import Foundation
     let empty = Category(name: "New Category", extensions: [])
     let rules = RuleSet(categories: [empty])
 
-    #expect(rules.problems == [.noExtensions(category: empty.id)])
+    #expect(rules.problems == [.noConditions(category: empty.id)])
     #expect(rules.canBeSaved)
 }
 
@@ -395,7 +395,7 @@ import Foundation
     let rules = RuleSet(categories: [images], fallbackName: ".Other")
 
     #expect(rules.problems == [
-        .noExtensions(category: images.id),
+        .noConditions(category: images.id),
         .hiddenName(category: nil, name: ".Other")
     ])
 }

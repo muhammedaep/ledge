@@ -873,18 +873,12 @@
         }
       }
     },
-    "No extensions, so nothing is ever filed here.": {
+    "No extensions and no patterns, so nothing is ever filed here.": {
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No extensions, so nothing is ever filed here."
-          }
-        },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uzantı yok, dolayısıyla buraya hiçbir şey klasörlenmez."
+            "value": "Uzantı da desen de yok, buraya hiçbir şey klasörlenmez."
           }
         }
       }

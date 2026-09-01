@@ -259,9 +259,9 @@ struct RulesPane: View {
                 messages.append(RuleMessage(
                     text: String(localized: "A name starting with a dot is hidden in the Finder."),
                     isBlocking: false))
-            case .noExtensions:
+            case .noConditions:
                 messages.append(RuleMessage(
-                    text: String(localized: "No extensions, so nothing is ever filed here."),
+                    text: String(localized: "No extensions and no patterns, so nothing is ever filed here."),
                     isBlocking: false))
             case let .shadowedExtension(_, ext, claimedBy):
                 if let existing = shadowed.firstIndex(where: { $0.claimedBy == claimedBy }) {

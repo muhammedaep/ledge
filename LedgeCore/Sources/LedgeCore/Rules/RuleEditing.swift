@@ -185,9 +185,13 @@ public extension RuleSet {
         /// A leading dot makes the destination invisible in Finder. Legal, and
         /// occasionally deliberate, but rarely what someone means to type.
         case hiddenName(category: Category.ID?, name: String)
-        /// A category claiming nothing never matches a file and never creates
-        /// its folder.
-        case noExtensions(category: Category.ID)
+        /// The category states no conditions at all — no extensions and no
+        /// patterns — so nothing can ever match it. Renamed from
+        /// `noExtensions`, which stopped being true the moment a category could
+        /// be pattern-only: a Screenshots rule has no extensions by design, and
+        /// warning about it would mean Ledge shipping a rule and immediately
+        /// calling it a mistake.
+        case noConditions(category: Category.ID)
         /// An earlier category already claims this extension. First match wins,
         /// so this one will never see a file of that type — not a fault, but
         /// invisible from the row itself.
@@ -209,7 +213,7 @@ public extension RuleSet {
             switch self {
             case let .unusableName(id, _, _), let .duplicateName(id, _, _), let .hiddenName(id, _):
                 return id
-            case let .noExtensions(id), let .shadowedExtension(id, _, _):
+            case let .noConditions(id), let .shadowedExtension(id, _, _):
                 return id
             }
         }
@@ -250,8 +254,8 @@ public extension RuleSet {
         var claimedBy: [String: String] = [:]
         for category in categories {
             found += nameProblems(category.name, category.id)
-            if category.extensions.isEmpty {
-                found.append(.noExtensions(category: category.id))
+            if category.extensions.isEmpty && category.namePatterns.isEmpty {
+                found.append(.noConditions(category: category.id))
             }
             var own: Set<String> = []
             for ext in category.extensions where own.insert(ext).inserted {

@@ -42,3 +42,21 @@ import Foundation
     let decoded = try JSONDecoder().decode(RuleSet.self, from: data)
     #expect(decoded == original)
 }
+
+@Test func aRuleSetSavedBeforePatternsExistedStillDecodes() {
+    let json = Data("""
+    {
+      "categories": [
+        { "id": "01434B4D-4C7B-4027-ACD4-4BCCF10AFAC1",
+          "name": "Images",
+          "extensions": ["png", "jpg"],
+          "subdivision": "none" }
+      ],
+      "fallbackName": "Other"
+    }
+    """.utf8)
+    let decoded = try! JSONDecoder().decode(RuleSet.self, from: json)
+    #expect(decoded.categories.count == 1)
+    #expect(decoded.categories[0].namePatterns.isEmpty)
+    #expect(decoded.appliedMigrations.isEmpty)
+}
