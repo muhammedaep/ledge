@@ -15,6 +15,12 @@ struct ErrorBanner: View {
     let message: String?
     let horizontalPadding: CGFloat
     let topPadding: CGFloat
+    /// Non-nil only when the failure named permission, so the button appears
+    /// exactly where it is a route out. See `AppState.isPermissionDenied`.
+    ///
+    /// Declared before `onDismiss` on purpose: the trailing closure at every
+    /// call site binds to the last parameter, and this one is not a literal.
+    var onOpenPrivacySettings: (() -> Void)?
     let onDismiss: () -> Void
 
     var body: some View {
@@ -22,9 +28,16 @@ struct ErrorBanner: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
-                Text(message)
-                    .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(message)
+                        .font(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let onOpenPrivacySettings {
+                        Button("Open Privacy Settings", action: onOpenPrivacySettings)
+                            .buttonStyle(.link)
+                            .font(.caption)
+                    }
+                }
                 Spacer(minLength: 4)
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")

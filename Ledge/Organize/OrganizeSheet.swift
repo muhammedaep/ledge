@@ -215,7 +215,9 @@ struct OrganizeSheet: View {
     /// files than the button promised is exactly the kind of lie this screen
     /// cannot afford.
     private var errorBanner: some View {
-        ErrorBanner(message: state.lastError, horizontalPadding: 14, topPadding: 10) {
+        ErrorBanner(message: state.lastError, horizontalPadding: 14, topPadding: 10,
+                    onOpenPrivacySettings: state.lastErrorOffersPrivacySettings
+                        ? { PrivacySettings.open() } : nil) {
             state.clearError()
         }
     }

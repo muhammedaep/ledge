@@ -21,7 +21,9 @@ struct SettingsView: View {
             // reason `updateRules` put in `lastError` — which is the very
             // detail that pane's comment complains was being sent somewhere the
             // user is not looking.
-            ErrorBanner(message: state.lastError, horizontalPadding: 14, topPadding: 10) {
+            ErrorBanner(message: state.lastError, horizontalPadding: 14, topPadding: 10,
+                    onOpenPrivacySettings: state.lastErrorOffersPrivacySettings
+                        ? { PrivacySettings.open() } : nil) {
                 state.clearError()
             }
 

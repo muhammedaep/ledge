@@ -355,7 +355,9 @@ struct ShelfView: View {
     /// of them. For an app whose whole job is moving the user's files, a failed
     /// undo that reports nothing is worse than one that never happened.
     private var errorBanner: some View {
-        ErrorBanner(message: state.lastError, horizontalPadding: 12, topPadding: 8) {
+        ErrorBanner(message: state.lastError, horizontalPadding: 12, topPadding: 8,
+                    onOpenPrivacySettings: state.lastErrorOffersPrivacySettings
+                        ? { PrivacySettings.open() } : nil) {
             state.clearError()
         }
     }

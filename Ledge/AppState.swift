@@ -46,7 +46,22 @@ final class AppState {
     private(set) var rules: RuleSet
     private(set) var projects: [Project] = []
     private(set) var recentRecords: [MoveRecord] = []
-    private(set) var lastError: String?
+    /// What went wrong, and whether the user can do anything about it here.
+    ///
+    /// A plain `String?` could not answer the second question, so a permission
+    /// failure read exactly like a full disk: a dead end. Stored as one value
+    /// rather than two properties so the message and its affordance cannot
+    /// drift — every site that sets one sets the other, and the compiler says
+    /// so, because `lastError` below is get-only.
+    struct Notice: Equatable {
+        var message: String
+        var offersPrivacySettings = false
+    }
+
+    private(set) var notice: Notice?
+
+    var lastError: String? { notice?.message }
+    var lastErrorOffersPrivacySettings: Bool { notice?.offersPrivacySettings ?? false }
 
     /// True while an Organize Now batch is being applied or undone.
     ///
@@ -90,9 +105,9 @@ final class AppState {
         // the message has to say where they went; a repaired one was read and
         // most of it survived, with nothing to recover.
         if rulesStore.lastLoadWasCorrupt {
-            lastError = String(localized: "Your rules file couldn't be read, so Ledge went back to the defaults. The old file was renamed, not deleted.")
+            notice = Notice(message: String(localized: "Your rules file couldn't be read, so Ledge went back to the defaults. The old file was renamed, not deleted."))
         } else if rulesStore.lastLoadWasRepaired {
-            lastError = String(localized: "Some of your rules named a folder Ledge can't use and were removed. The rest are unchanged.")
+            notice = Notice(message: String(localized: "Some of your rules named a folder Ledge can't use and were removed. The rest are unchanged."))
         }
         projects = projectStore.load()
         Task { await refreshRecords() }
@@ -286,10 +301,10 @@ final class AppState {
             // Names, not a disk problem — and worth naming, since the whole
             // point is that the user cannot see where the bad one is.
             let names = unusable.names.map { "“\($0)”" }.formatted(.list(type: .and))
-            lastError = String(localized: "Those rules weren't saved: \(names) can't be a folder name.")
+            notice = Notice(message: String(localized: "Those rules weren't saved: \(names) can't be a folder name."))
             return false
         } catch {
-            lastError = String(localized: "Couldn't save your rules.")
+            notice = Notice(message: String(localized: "Couldn't save your rules."))
             return false
         }
     }
@@ -316,7 +331,7 @@ final class AppState {
         do {
             try projectStore.save(newProjects)
         } catch {
-            lastError = String(localized: "Couldn't save your projects.")
+            notice = Notice(message: String(localized: "Couldn't save your projects."))
             return false
         }
         projects = newProjects
@@ -348,8 +363,8 @@ final class AppState {
         // which is exactly the case this guard exists to catch.
         guard FileEntry.isDirectory(atPath: project.folder.path) else {
             preferences.activeProjectID = nil
-            lastError = String(
-                localized: "Project folder is missing — filing into \(foundIn.lastPathComponent) instead.")
+            notice = Notice(message: String(
+                localized: "Project folder is missing — filing into \(foundIn.lastPathComponent) instead."))
             return foundIn
         }
         return project.folder
@@ -382,7 +397,7 @@ final class AppState {
                 ))
                 moved += 1
             } catch {
-                lastError = failure(String(localized: "Couldn't move \(planned.source.lastPathComponent)."), error)
+                notice = failure(String(localized: "Couldn't move \(planned.source.lastPathComponent)."), error)
             }
         }
         lastOrganizeOutcome = BatchOutcome(id: batch, moved: moved, attempted: plan.count)
@@ -412,7 +427,7 @@ final class AppState {
                     originalName: url.lastPathComponent, from: root, to: final))
                 await refreshRecords()
             } catch {
-                lastError = failure(String(localized: "Couldn't file \(url.lastPathComponent)."), error)
+                notice = failure(String(localized: "Couldn't file \(url.lastPathComponent)."), error)
             }
         }
     }
@@ -430,9 +445,43 @@ final class AppState {
     /// The phrasing lives here rather than on `MoveError` because `LedgeCore`
     /// produces data and the app produces sentences — a rule `make strings`
     /// enforces by refusing localization APIs inside the package.
-    private func failure(_ headline: String, _ error: Error) -> String {
-        guard let reason = reason(for: error) else { return headline }
-        return "\(headline) \(reason)"
+    private func failure(_ headline: String, _ error: Error) -> Notice {
+        let reason = reason(for: error)
+        return Notice(
+            message: reason.map { "\(headline) \($0)" } ?? headline,
+            offersPrivacySettings: isPermissionDenied(error))
+    }
+
+    /// Whether the route out of this failure is System Settings.
+    ///
+    /// Offered only for a failure that actually names permission. A full disk
+    /// and a vanished folder are dead ends here too, and a button that opens
+    /// the wrong panel is worse than no button — it sends the user to change a
+    /// setting that was never the problem.
+    ///
+    /// Not a guarantee that the panel holds the answer. macOS refuses to move a
+    /// file that is also hard-linked into a protected directory, and phrases
+    /// that refusal as a permission error naming the *destination* — measured
+    /// on 2026-09-01, where the destination was demonstrably writable and the
+    /// source's second link was inside another app's Application Support. The
+    /// button is a route worth offering, not a diagnosis.
+    private func isPermissionDenied(_ error: Error) -> Bool {
+        switch error as? MoveError {
+        case .destinationNotWritable:
+            return true
+        case let .underlying(domain, code, _):
+            switch domain {
+            case NSCocoaErrorDomain:
+                return code == NSFileWriteNoPermissionError
+                    || code == NSFileReadNoPermissionError
+            case NSPOSIXErrorDomain:
+                return code == Int(EPERM) || code == Int(EACCES)
+            default:
+                return false
+            }
+        default:
+            return false
+        }
     }
 
     private func reason(for error: Error) -> String? {
@@ -466,7 +515,7 @@ final class AppState {
             try await filing.undo(record)
             await refreshRecords()
         } catch {
-            lastError = failure(String(localized: "Couldn't undo \(record.originalName)."), error)
+            notice = failure(String(localized: "Couldn't undo \(record.originalName)."), error)
         }
     }
 
@@ -512,7 +561,7 @@ final class AppState {
             if lastOrganizeOutcome?.id == batchID { lastOrganizeOutcome = nil }
             await refreshRecords()
         } catch {
-            lastError = failure(String(localized: "Couldn't undo that batch."), error)
+            notice = failure(String(localized: "Couldn't undo that batch."), error)
         }
     }
 
@@ -534,6 +583,6 @@ final class AppState {
     /// outside this class, and the shelf needs to be able to put the banner
     /// away once the user has read it.
     func clearError() {
-        lastError = nil
+        notice = nil
     }
 }
