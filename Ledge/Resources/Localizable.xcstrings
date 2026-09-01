@@ -486,7 +486,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Filing into:"
+            "value": "FILING INTO"
           }
         },
         "tr": {
@@ -577,6 +577,18 @@
         }
       }
     },
+    "It is no longer where Ledge found it.": {
+      "comment": "Why a move failed: the file was gone before Ledge could move it.",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosya, Ledge'in bulduğu yerde artık yok."
+          }
+        }
+      }
+    },
     "Keep %lld items on the shelf": {
       "localizations": {
         "en": {
@@ -653,6 +665,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ledge, %@ klasörünü okuyamıyor"
+          }
+        }
+      }
+    },
+    "Ledge can't write to %@.": {
+      "comment": "Why a move failed, where %@ is the destination folder's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledge %@ klasörüne yazamıyor."
           }
         }
       }
@@ -1090,7 +1114,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Recent Downloads"
+            "value": "RECENT DOWNLOADS"
           }
         },
         "tr": {

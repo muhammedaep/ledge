@@ -265,6 +265,50 @@ def check_core_package(core_sources):
 
 # --------------------------------------------------------------------------
 
+def check_source_language(catalog_path):
+    """CHECK 3 — no English localization that contradicts its own key.
+
+    The catalog's sourceLanguage is `en` and its keys *are* the English text,
+    so an explicit `en` entry is only ever a restatement of the key. When the
+    two disagree, the key is what the source code says and the entry is what
+    the app renders — and the app wins, silently.
+
+    Written after renaming two keys to uppercase changed nothing on screen: the
+    rebuilt app still drew "Filing into:" because the `en` value had been left
+    behind at the old wording, and Check 1 was satisfied the whole time because
+    it only ever asks about the translation language.
+    """
+    print("CHECK 3 — English values agree with their keys")
+    catalog = load_catalog(catalog_path)
+    source_language = catalog.get("sourceLanguage", "en")
+    strings = catalog.get("strings", {})
+
+    mismatched = []
+    for key, entry in strings.items():
+        unit = (entry.get("localizations", {})
+                     .get(source_language, {})
+                     .get("stringUnit", {}))
+        value = unit.get("value")
+        if value is not None and value != key:
+            mismatched.append((key, value))
+
+    print(f"  {len(strings)} keys checked against their '{source_language}' value")
+    if mismatched:
+        print(f"  FAILED: {len(mismatched)} key(s) render as something other than themselves.")
+        for key, value in sorted(mismatched):
+            print(f"    key:      {key!r}")
+            print(f"    renders:  {value!r}")
+        print("  The source code says one thing and the app shows another. Either")
+        print(f"  update the '{source_language}' value to match the key, or delete it —")
+        print("  a missing source-language entry falls back to the key, which is right.")
+        return False, False
+
+    print(f"  OK: every '{source_language}' value matches its key.")
+    return True, False
+
+
+# --------------------------------------------------------------------------
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stringsdata-root", required=True,
@@ -281,6 +325,8 @@ def main():
         args.stringsdata_root, args.catalog, args.language)
     print()
     core_ok, core_fatal = check_core_package(args.core_sources)
+    print()
+    source_ok, source_fatal = check_source_language(args.catalog)
 
     print()
     print("What these checks cannot see:")
@@ -293,12 +339,14 @@ def main():
     print("    conformance emits no .stringsdata to read. It ignores comments, so a")
     print("    doc comment naming one of these APIs is not flagged; equally, a use")
     print("    built by string concatenation at runtime would not be caught.")
-    print("  - Neither says whether a translation is correct, or whether it fits the")
-    print("    layout at Turkish length.")
+    print("  - Check 3 compares the catalog against itself. It cannot tell whether")
+    print("    a key is good English, only that the app renders what the source says.")
+    print("  - None of them says whether a translation is correct, or whether it fits")
+    print("    the layout at Turkish length.")
 
-    if catalog_fatal or core_fatal:
+    if catalog_fatal or core_fatal or source_fatal:
         return 2
-    return 0 if (catalog_ok and core_ok) else 1
+    return 0 if (catalog_ok and core_ok and source_ok) else 1
 
 
 if __name__ == "__main__":

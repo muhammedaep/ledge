@@ -382,7 +382,7 @@ final class AppState {
                 ))
                 moved += 1
             } catch {
-                lastError = String(localized: "Couldn't move \(planned.source.lastPathComponent).")
+                lastError = failure(String(localized: "Couldn't move \(planned.source.lastPathComponent)."), error)
             }
         }
         lastOrganizeOutcome = BatchOutcome(id: batch, moved: moved, attempted: plan.count)
@@ -412,8 +412,42 @@ final class AppState {
                     originalName: url.lastPathComponent, from: root, to: final))
                 await refreshRecords()
             } catch {
-                lastError = String(localized: "Couldn't file \(url.lastPathComponent).")
+                lastError = failure(String(localized: "Couldn't file \(url.lastPathComponent)."), error)
             }
+        }
+    }
+
+    /// A failure headline with the reason appended, when there is one worth
+    /// showing.
+    ///
+    /// Added after the first real run put "Couldn't file Magister-Overview-EN.pptx."
+    /// on screen and nothing else. Every one of these sites had the reason in
+    /// hand — `MoveError.underlying` carries the domain, the code and the
+    /// system's own description — and threw it away in the `catch`. A user
+    /// could not tell a permission problem from a full disk, and neither could
+    /// anyone they reported it to.
+    ///
+    /// The phrasing lives here rather than on `MoveError` because `LedgeCore`
+    /// produces data and the app produces sentences — a rule `make strings`
+    /// enforces by refusing localization APIs inside the package.
+    private func failure(_ headline: String, _ error: Error) -> String {
+        guard let reason = reason(for: error) else { return headline }
+        return "\(headline) \(reason)"
+    }
+
+    private func reason(for error: Error) -> String? {
+        switch error as? MoveError {
+        case .sourceMissing:
+            return String(localized: "It is no longer where Ledge found it.")
+        case let .destinationNotWritable(folder):
+            return String(localized: "Ledge can't write to \(folder.lastPathComponent).")
+        case let .underlying(_, _, description):
+            // Already localized by the system, and more specific than anything
+            // written here could be.
+            return description
+        case nil:
+            let described = (error as NSError).localizedDescription
+            return described.isEmpty ? nil : described
         }
     }
 
@@ -432,7 +466,7 @@ final class AppState {
             try await filing.undo(record)
             await refreshRecords()
         } catch {
-            lastError = String(localized: "Couldn't undo \(record.originalName).")
+            lastError = failure(String(localized: "Couldn't undo \(record.originalName)."), error)
         }
     }
 
@@ -478,7 +512,7 @@ final class AppState {
             if lastOrganizeOutcome?.id == batchID { lastOrganizeOutcome = nil }
             await refreshRecords()
         } catch {
-            lastError = String(localized: "Couldn't undo that batch.")
+            lastError = failure(String(localized: "Couldn't undo that batch."), error)
         }
     }
 
