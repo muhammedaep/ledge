@@ -186,7 +186,8 @@ test that hits the filesystem works in its own temporary directory.
 
 `docs/manual-checks.md` is a ten-minute list of things only a person with a pointer
 can confirm — the drag-out, undo, project routing, and that ejecting a drive does
-not lock you out of the app. None of it can be automated.
+not lock you out of the app. None of it can be automated. A Turkish translation of
+the same list lives in `docs/manual-checks.tr.md`.
 
 `docs/known-limitations.md` records what was deliberately left, and why, while the
 reasons were still legible.

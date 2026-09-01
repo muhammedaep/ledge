@@ -1,5 +1,8 @@
 # Manual checks
 
+> In Turkish: [`manual-checks.tr.md`](manual-checks.tr.md). The two files are
+> the same list — if one changes, the other has to.
+
 Everything in this list needs a human with a pointer and a screen. None of it can
 be automated from a headless session, and all of it was left unverified when the
 first version was built — so it is the shortest path from "the tests pass" to
