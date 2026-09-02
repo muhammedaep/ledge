@@ -133,6 +133,14 @@ If you do, the places most likely to break are, in order:
    English and sits in the app's tightest horizontal budget, competing with the
    date and the undo button. Look at a stale row with a long filename.
 3. **The Organize sheet's Move button** with a three-digit count.
+4. **The Rules tab's rewritten sentences, for correctness rather than fit.** Four
+   Turkish sentences changed today when the Rules tab's vocabulary moved from
+   "category" to "rule." Two independent reads found them sound and both flagged
+   the same small thing: in "Bir kuralı yeniden adlandırmak, eski adla
+   klasörlenmiş dosyaları taşımaz.", `eski adla` reads better as `eski adıyla` —
+   "with *its* old name," which is what the sentence's antecedent wants. Small
+   either way, but this is a call for a native reader, not a grammar rule, and
+   nobody who reads Turkish has looked at it yet.
 
 ## 9. A denied permission explains itself
 
@@ -149,10 +157,50 @@ Take a screenshot into a watched folder. It should land in `Screenshots/`, not
 with its patterns visible and editable. Delete it, quit, relaunch — it must
 stay deleted.
 
-## 11. What could not be established here at all
+## 11. The visual pass
+
+Look at the shelf in light and in dark, then again with Ledge set to Turkish
+(System Settings → General → Language & Region → the per-app list). In each of
+the four combinations:
+
+- A filed row reads as an object you could pick up, not a line in a log. That
+  containment is the whole design; if the rows read as a list, say so.
+- A stale row is flat and obviously dead, and its undo is still *visible* —
+  dimmed, not gone.
+- The metadata line truncates from the right, so the destination survives and
+  the time is what disappears. `Taşınmış veya silinmiş · 26 dk önce` must fit.
+- Tab to the undo button. It takes a focus ring and fires on Return. If it
+  cannot be reached without a pointer, that is a defect and not a nitpick.
+- Settings → Rules: put two rules into a warning state at once and give one a
+  Turkish diagnostic. The card grows, the list scrolls, nothing is clipped.
+- The type badge on a screenshot is the image colour, not the Screenshots
+  category's — a PNG looks like an image wherever it lands.
+- Put a watched folder into the state check 6 describes, then click the warning
+  banner's **Choose Folder Again…** button and confirm Settings comes to the
+  front over whatever app you were in. Nobody has clicked this button yet. The
+  code pairs `NSApplication.shared.activate(ignoringOtherApps: true)` with
+  `openSettings()`, on the reasoning that the latter alone is not documented to
+  raise the window while Ledge sits backgrounded as an accessory app — whether
+  that pairing is doing real work or the `activate` call is redundant is
+  answerable only by clicking it.
+
+None of this replaces the checks above. An interface that looks better and
+breaks the drag-out, undo, the stale row, project routing, the
+folder-as-one-unit rule or the eject lockout is a loss, not a trade.
+
+## 12. What could not be established here at all
+
+Colour is deliberately missing from the list below. Three of the tasks that
+built this interface measured it off-screen with `ImageRenderer` — rendering
+the real view and reading pixels back, which needs no Screen Recording or
+Accessibility permission at all — and that measurement is what caught a
+conditional style rendering two states that were supposed to differ in the
+identical grey, twice, before anyone looked at a screen. What follows is what
+that technique cannot reach:
 
 - Whether the menu bar panel notices access being **revoked while it is closed**.
   It is the only signal that catches that case, and no agent could test it.
 - Anything about how the layout actually looks: spacing, alignment, whether the
   panel's cross-display frame jump when the Organize sheet attaches reads as a
-  glitch.
+  glitch, and whether the Turkish strings above actually fit the frames they
+  were measured against on paper.

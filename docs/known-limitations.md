@@ -81,13 +81,23 @@ repeating timers and applies it only to the first deadline. That was measured.
 
 ## What has not been seen by anyone
 
-Everything visual. No agent that built this had Screen Recording or Accessibility
-permission, so the entire interface is unverified as *rendered* — layout, spacing,
-whether Turkish text fits its frames, whether the panel's cross-display frame jump
-when the Organize sheet attaches reads as a glitch.
+Not quite everything visual, in the end. No agent that built this had Screen
+Recording or Accessibility permission, and for most of the build the working
+assumption was that nothing rendered could be checked without them. That
+turned out to be too strong: `ImageRenderer` renders a SwiftUI view off-screen
+and its pixels can be read back, with no screen permission of any kind needed.
+Three tasks used it to settle colour questions that reasoning had gotten
+wrong — twice, a conditional style shipped rendering two states that were
+supposed to differ in the identical grey, and it was the pixel comparison that
+caught it, not a second reading of the code.
+
+What that technique cannot reach is everything else: layout, spacing, whether
+Turkish text fits its frames, whether the panel's cross-display frame jump
+when the Organize sheet attaches reads as a glitch. That narrower set is the
+real unverified-as-rendered list, and it is not shrunk by the above.
 
 `docs/manual-checks.md` is the list. The drag-out itself was confirmed by hand
-early on; nothing else was.
+early on; nothing else on it was.
 
 ## The build is native-arch only
 
@@ -95,3 +105,18 @@ early on; nothing else was.
 archive` is intended to produce a universal build and has never been run. There is
 no notarised release, no Homebrew cask, and no App Store presence — the README says
 so, and it should keep saying so until one of those is actually true.
+
+## The Rules tab has no drag-to-reorder
+
+The design carries precedence three ways: an ordinal, a drag grip, and the
+rubric. Two shipped. Reordering is by the up/down buttons, which work from
+the keyboard; the grip was left for a piece of work that can give drop
+targets and accessibility the attention they need. Nothing is missing — this
+is a second route that does not exist yet.
+
+## The accent colour is pinned
+
+`#0a6cd6` light, `#409cff` dark, rather than `Color.accentColor`. A user who
+has set a pink system accent sees the design's blue. That followed from the
+instruction that it look exactly like the design, and it is recorded here so
+the next person reads it as a decision rather than an oversight.

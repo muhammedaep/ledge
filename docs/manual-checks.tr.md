@@ -143,6 +143,16 @@ Atarsan, kırılmaya en yatkın yerler sırasıyla şunlar:
    yarışarak duruyor. Uzun adlı, bayatlamış bir satıra bak.
 3. **Şimdi Düzenle penceresindeki taşıma butonu** üç haneli bir sayıyla
    (`%lld Öğeyi Taşı`).
+4. **Kurallar sekmesinde bugün yeniden yazılan cümleler — bu sefer sığma değil,
+   doğruluk için.** Kurallar sekmesinin sözlüğü "kategori"den "kural"a
+   geçerken dört Türkçe cümle değişti. İki bağımsız okuma da cümleleri sağlam
+   buldu, ikisi de aynı küçük noktayı işaretledi: "Bir kuralı yeniden
+   adlandırmak, eski adla klasörlenmiş dosyaları taşımaz." cümlesinde `eski
+   adla` yerine `eski adıyla` daha iyi okunuyor — cümlenin konusu zaten "kural"
+   olduğundan, "onun eski adıyla" okuması böyle daha net oturuyor. Ufak bir
+   fark, ama bu bir
+   dilbilgisi kuralından çok anadili sezgisi meselesi ve Türkçe okuyan henüz
+   kimse bakmadı.
 
 ## 9. Reddedilen izin kendini açıklıyor
 
@@ -159,10 +169,53 @@ Neyin yanlış olduğunu söyleyen ve düzeltme yolu sunan bir ekran görmelisin
 Images'ın üstünde, desenleri görünür ve düzenlenebilir halde. Sil, çık,
 yeniden başlat — silinmiş kalmalı.
 
-## 11. Burada hiç doğrulanamayanlar
+## 11. Görsel geçiş
+
+Rafa açık temada, koyu temada, bir de Ledge'i Türkçe'ye alıp tekrar bak (System
+Settings → General → Language & Region → en alttaki uygulama listesi). Dört
+kombinasyonun her birinde:
+
+- Klasörlenmiş bir satır elle tutulabilecek bir nesne gibi durmalı, bir günlük
+  satırı gibi değil. Bütün tasarım bu kapsanmışlık hissi üzerine kurulu;
+  satırlar bir liste gibi duruyorsa bunu söyle.
+- Bayatlamış bir satır düz ve belli belirsiz ölü durmalı, geri alması ise hâlâ
+  *görünür* olmalı — gitmiş değil, sadece soluk.
+- Alt başlık satırı sağdan kısaltılmalı, böylece hedef kalır, kaybolan zaman
+  olur. `Taşınmış veya silinmiş · 26 dk önce` sığmalı.
+- Geri alma butonuna Tab ile git. Odak halkası almalı ve Return'e basınca
+  çalışmalı. Fareyle ulaşılamıyorsa bu bir kusurdur, ince bir detay değil.
+- Ayarlar → Kurallar: aynı anda iki kuralı uyarı durumuna sok ve birine Türkçe
+  bir tanılama ver. Kart büyümeli, liste kaymalı, hiçbir şey kırpılmamalı.
+- Bir ekran görüntüsündeki tür rozeti, Screenshots kategorisinin değil,
+  görüntünün kendi rengi olmalı — bir PNG nereye düşerse düşsün bir görüntü
+  gibi görünmeli.
+- 6. kontrolün anlattığı duruma bir klasörü sok, sonra uyarı şeridindeki
+  **Choose Folder Again…** (Klasörü Yeniden Seç…) butonuna tıkla ve Ayarlar
+  penceresinin, o an neyle uğraşıyor olursan ol, öne geldiğini doğrula. Bu
+  butona şimdiye kadar kimse tıklamadı. Kod, `openSettings()`'in tek başına,
+  Ledge arka planda bir "accessory app" olarak dururken pencereyi öne
+  getireceğinin belgeli olmadığı gerekçesiyle yanına
+  `NSApplication.shared.activate(ignoringOtherApps: true)` çağrısını
+  eklemiş — bu eşleşmenin gerçekten işe yarayıp yaramadığı, yoksa `activate`
+  çağrısının gereksiz mi olduğu, ancak tıklayarak anlaşılabilir.
+
+Bunların hiçbiri yukarıdaki kontrollerin yerini tutmaz. Daha iyi görünen ama
+sürükleyip çıkarmayı, geri almayı, bayatlamış satırı, proje yönlendirmesini,
+klasörün-tek-parça kuralını ya da çıkarma kilidini bozan bir arayüz, bir
+kazanım değil, bir kayıptır.
+
+## 12. Burada hiç doğrulanamayanlar
+
+Renk, aşağıdaki listede bilerek yok. Bu arayüzü kuran görevlerden üçü rengi
+ekran dışı `ImageRenderer` ile ölçtü — gerçek görünümü render edip pikselleri
+geri okuyarak, Screen Recording ya da Accessibility izni hiç gerekmeden — ve bu
+ölçüm, birbirinden farklı olması gereken iki durumu aynı griyle çizen bir
+koşullu stili, kimse ekrana bakmadan önce, iki kez yakaladı. Aşağıdakiler bu
+yöntemin ulaşamadığı yerler:
 
 - Menü çubuğu panelinin, erişim **kapalıyken kaldırıldığında** bunu fark edip
   etmediği. Bu durumu yakalayan tek sinyal odur ve hiçbir ajan test edemedi.
-- Yerleşimin gerçekte nasıl göründüğüne dair her şey: boşluklar, hizalama ve
-  Şimdi Düzenle penceresi iliştiğinde panelin ekranlar arası çerçeve sıçramasının
-  bir hata gibi durup durmadığı.
+- Yerleşimin gerçekte nasıl göründüğüne dair her şey: boşluklar, hizalama,
+  Şimdi Düzenle penceresi iliştiğinde panelin ekranlar arası çerçeve
+  sıçramasının bir hata gibi durup durmadığı ve yukarıdaki Türkçe metinlerin,
+  kâğıt üzerinde ölçülen çerçevelere gerçekten oturup oturmadığı.
