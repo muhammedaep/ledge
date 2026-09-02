@@ -138,7 +138,7 @@ struct RulesPane: View {
         HStack(spacing: 8) {
             // Appended, not inserted: last place is the only position that
             // cannot take an extension away from a rule the user already has.
-            Button("Add Category") {
+            Button("＋ Add Rule") {
                 draft.categories.append(Category(name: String(localized: "New Category"), extensions: []))
             }
             Button("Reset to Defaults") { confirmingReset = true }

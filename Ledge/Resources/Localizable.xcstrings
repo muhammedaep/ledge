@@ -65,22 +65,6 @@
         }
       }
     },
-    "Add Category": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Add Category"
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kategori Ekle"
-          }
-        }
-      }
-    },
     "Add Folder…": {
       "localizations": {
         "en": {
@@ -1507,6 +1491,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "şimdi"
+          }
+        }
+      }
+    },
+    "＋ Add Rule": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "＋ Kural Ekle"
           }
         }
       }
