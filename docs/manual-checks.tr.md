@@ -178,12 +178,12 @@ kombinasyonun her birinde:
 - Klasörlenmiş bir satır elle tutulabilecek bir nesne gibi durmalı, bir günlük
   satırı gibi değil. Bütün tasarım bu kapsanmışlık hissi üzerine kurulu;
   satırlar bir liste gibi duruyorsa bunu söyle.
-- Bayatlamış bir satır düz ve belli belirsiz ölü durmalı, geri alması ise hâlâ
+- Bayatlamış bir satır düz ve açıkça ölü durmalı, geri alması ise hâlâ
   *görünür* olmalı — gitmiş değil, sadece soluk.
 - Alt başlık satırı sağdan kısaltılmalı, böylece hedef kalır, kaybolan zaman
   olur. `Taşınmış veya silinmiş · 26 dk önce` sığmalı.
 - Geri alma butonuna Tab ile git. Odak halkası almalı ve Return'e basınca
-  çalışmalı. Fareyle ulaşılamıyorsa bu bir kusurdur, ince bir detay değil.
+  çalışmalı. Fare olmadan ulaşılamıyorsa bu bir kusurdur, ince bir detay değil.
 - Ayarlar → Kurallar: aynı anda iki kuralı uyarı durumuna sok ve birine Türkçe
   bir tanılama ver. Kart büyümeli, liste kaymalı, hiçbir şey kırpılmamalı.
 - Bir ekran görüntüsündeki tür rozeti, Screenshots kategorisinin değil,
