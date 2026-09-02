@@ -35,6 +35,24 @@
     },
     "%lld items would move. Folders move whole — Ledge never files their contents.": {
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld item would move. Folders move whole — Ledge never files their contents."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld items would move. Folders move whole — Ledge never files their contents."
+                }
+              }
+            }
+          }
+        },
         "tr": {
           "stringUnit": {
             "state": "translated",
@@ -719,6 +737,24 @@
     },
     "Move %lld Items": {
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Move %lld Item"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Move %lld Items"
+                }
+              }
+            }
+          }
+        },
         "tr": {
           "stringUnit": {
             "state": "translated",
@@ -1048,6 +1084,16 @@
         }
       },
       "shouldTranslate": false
+    },
+    "PROJECT MODE": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PROJE MODU"
+          }
+        }
+      }
     },
     "Project folder is missing — filing into %@ instead.": {
       "localizations": {

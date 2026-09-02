@@ -245,7 +245,7 @@ struct ShelfView: View {
                 Image(systemName: "gearshape")
                     .frame(width: 28, height: Theme.Size.button)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(HoverGlyphButtonStyle())
             .foregroundStyle(.secondary)
             .help(String(localized: "Settings"))
 
@@ -255,7 +255,7 @@ struct ShelfView: View {
                 Image(systemName: "power")
                     .frame(width: 28, height: Theme.Size.button)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(HoverGlyphButtonStyle())
             .foregroundStyle(.secondary)
             .help(String(localized: "Quit Ledge"))
         }
@@ -315,11 +315,17 @@ struct ShelfView: View {
             // itself: that struct's `message` is a single string, and this
             // banner has two registers to keep apart — the sentence, and the
             // folder names, which stay `.secondary` rather than sharing the
-            // warning colour. One action replaces the old pair (a Privacy
-            // Settings shortcut for a blocked folder, a plain Settings link for
-            // everything else): re-picking a folder from the watched-folder
-            // list fixes both a folder that is merely gone and one that is
-            // blocked, so one destination now covers what needed two routes.
+            // warning colour. The action branches exactly the way the icon
+            // above it already does: a folder that is merely gone is fixed by
+            // re-picking it in Settings, but a folder TCC has denied is fixed
+            // only in Privacy & Security — Settings has a status icon, Remove
+            // and Add Folder…, and none of the three re-grants a folder that
+            // is already watched. Re-adding the same folder through Add
+            // Folder… is a no-op (`FolderIdentity.adding` dedupes it before
+            // `AppState.addWatchedFolder` ever calls `startWatching()`), so
+            // "Choose Folder Again…" would open a pane with nothing in it
+            // that fixes a blocked folder — exactly the state this banner
+            // exists to explain.
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: blocked.isEmpty
                       ? "externaldrive.trianglebadge.exclamationmark"
@@ -336,16 +342,26 @@ struct ShelfView: View {
                         .rowMeta()
                         .lineLimit(1)
                         .truncationMode(.head)
-                    Button(String(localized: "Choose Folder Again…")) {
-                        // `openSettings()` alone was not verified to raise the
-                        // window over whatever the user is in front of — Ledge
-                        // is an accessory app (LSUIElement) and never frontmost
-                        // while the shelf is open, the same reason
-                        // `chooseProject()` below activates before its own
-                        // panel. Keeping the pairing rather than assuming the
-                        // environment action already covers it.
-                        NSApplication.shared.activate(ignoringOtherApps: true)
-                        openSettings()
+                    Button(blocked.isEmpty
+                           ? String(localized: "Choose Folder Again…")
+                           : String(localized: "Open Privacy Settings")) {
+                        if blocked.isEmpty {
+                            // `openSettings()` alone was not verified to raise
+                            // the window over whatever the user is in front of
+                            // — Ledge is an accessory app (LSUIElement) and
+                            // never frontmost while the shelf is open, the
+                            // same reason `chooseProject()` below activates
+                            // before its own panel. Keeping the pairing rather
+                            // than assuming the environment action already
+                            // covers it.
+                            NSApplication.shared.activate(ignoringOtherApps: true)
+                            openSettings()
+                        } else {
+                            // The one place a denied TCC grant can be
+                            // reversed — Settings' General pane has no control
+                            // that does this.
+                            PrivacySettings.open()
+                        }
                     }
                     .buttonStyle(.plain)
                     .font(.system(size: 11, weight: .medium))
@@ -416,7 +432,9 @@ struct ShelfView: View {
     /// which folder the next download will land in.
     private var destinationHeader: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("FILING INTO")
+            Text(state.activeProject == nil
+                 ? String(localized: "FILING INTO")
+                 : String(localized: "PROJECT MODE"))
                 .sectionLabel()
 
             Menu {

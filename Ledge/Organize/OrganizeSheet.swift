@@ -100,7 +100,11 @@ struct OrganizeSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Organize Now").titleText()
 
-            Text("\(preview.plan.count) items would move. Folders move whole — Ledge never files their contents.")
+            // `movableCount`, not `preview.plan.count`: the caption and the
+            // Move button have to agree on what "would move" means once a
+            // category is unchecked, or the two numbers read as a bug rather
+            // than as two views of one plan.
+            Text("\(movableCount) items would move. Folders move whole — Ledge never files their contents.")
                 .rowMeta()
                 .fixedSize(horizontal: false, vertical: true)
 

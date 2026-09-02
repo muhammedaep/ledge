@@ -99,6 +99,39 @@ enum Theme {
     }
 }
 
+/// A plain glyph button that darkens with `Theme.Colour.hover` under the
+/// pointer — the one neutral spec §4 gives every hover state, applied here so
+/// a control that shows nothing at rest isn't also invisible to a mouse that
+/// has found it. Existence never depends on hover, only emphasis: nothing
+/// here disables the button or hides the glyph when the pointer moves away,
+/// the same rule the shelf's undo button follows.
+struct HoverGlyphButtonStyle: ButtonStyle {
+    var cornerRadius: CGFloat = 6
+
+    func makeBody(configuration: Configuration) -> some View {
+        HoverGlyphButtonBody(configuration: configuration, cornerRadius: cornerRadius)
+    }
+}
+
+/// Split out from `HoverGlyphButtonStyle` because a `ButtonStyle` is handed a
+/// fresh `Configuration` value on every call; `isHovered` needs a `View` to
+/// live in so `@State` can hold it across redraws.
+private struct HoverGlyphButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let cornerRadius: CGFloat
+    @State private var isHovered = false
+
+    var body: some View {
+        configuration.label
+            .background {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(isHovered ? Theme.Colour.hover : Color.clear)
+            }
+            .onHover { isHovered = $0 }
+            .animation(.easeOut(duration: 0.12), value: isHovered)
+    }
+}
+
 extension View {
     /// 11 semibold, +0.06em, tertiary. The uppercase is in the string, not here
     /// — see the global constraint about Turkish `İ`.

@@ -572,20 +572,35 @@ private struct CategoryRow: View {
                 if isExpanded {
                     fieldsAndDiagnostics
                 } else {
-                    Text(collapsedSummary)
-                        .mono()
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    // A `Button`, not a `Text` with `.onTapGesture`: a tap
+                    // gesture is invisible to Tab, and this row is otherwise
+                    // unreachable by anything but the name field. Nine of the
+                    // ten default rules collapse to exactly this state, and
+                    // this is the only route from there to the patterns
+                    // field, the diagnostics and the Subfolders picker.
+                    Button {
+                        isEditingExtensions = true
+                    } label: {
+                        Text(collapsedSummary)
+                            .mono()
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
             Spacer(minLength: 4)
 
             Button(role: .destructive, action: remove) {
-                Image(systemName: "minus.circle").font(.system(size: 11))
+                Image(systemName: "minus.circle")
+                    .font(.system(size: 11))
+                    .frame(width: 20, height: 20)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(HoverGlyphButtonStyle(cornerRadius: 5))
             .foregroundStyle(.secondary)
             .help("Remove this rule")
         }
