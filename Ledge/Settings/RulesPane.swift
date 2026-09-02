@@ -60,13 +60,13 @@ struct RulesPane: View {
         // The complaint belongs to the draft that earned it.
         .onChange(of: draft) { saveFailed = false }
         .confirmationDialog(
-            "Replace your categories with the defaults?",
+            "Replace your rules with the defaults?",
             isPresented: $confirmingReset
         ) {
             Button("Reset to Defaults", role: .destructive) { replaceDraft(with: .defaults) }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Every category you have added or changed is discarded. Nothing is written until you save.")
+            Text("Every rule you have added or changed is discarded. Nothing is written until you save.")
         }
     }
 
@@ -79,7 +79,7 @@ struct RulesPane: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, Theme.Space.panel)
                 .padding(.bottom, 8)
-            Text("Renaming a category doesn't move files that were already filed under the old name.")
+            Text("Renaming a rule doesn't move files that were already filed under its old name.")
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -139,7 +139,7 @@ struct RulesPane: View {
             // Appended, not inserted: last place is the only position that
             // cannot take an extension away from a rule the user already has.
             Button("＋ Add Rule") {
-                draft.categories.append(Category(name: String(localized: "New Category"), extensions: []))
+                draft.categories.append(Category(name: String(localized: "New Rule"), extensions: []))
             }
             Button("Reset to Defaults") { confirmingReset = true }
 
@@ -587,7 +587,7 @@ private struct CategoryRow: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("Remove this category")
+            .help("Remove this rule")
         }
         .padding(.vertical, 9)
         .padding(.horizontal, Theme.Space.card)

@@ -451,18 +451,12 @@
         }
       }
     },
-    "Every category you have added or changed is discarded. Nothing is written until you save.": {
+    "Every rule you have added or changed is discarded. Nothing is written until you save.": {
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Every category you have added or changed is discarded. Nothing is written until you save."
-          }
-        },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Eklediğiniz ya da değiştirdiğiniz her kategori atılır. Siz kaydedene kadar hiçbir şey yazılmaz."
+            "value": "Eklediğiniz ya da değiştirdiğiniz her kural atılır. Siz kaydedene kadar hiçbir şey yazılmaz."
           }
         }
       }
@@ -867,18 +861,12 @@
         }
       }
     },
-    "New Category": {
+    "New Rule": {
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "New Category"
-          }
-        },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Yeni Kategori"
+            "value": "Yeni Kural"
           }
         }
       }
@@ -1143,50 +1131,32 @@
         }
       }
     },
-    "Remove this category": {
+    "Remove this rule": {
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remove this category"
-          }
-        },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bu kategoriyi kaldır"
+            "value": "Bu kuralı kaldır"
           }
         }
       }
     },
-    "Renaming a category doesn't move files that were already filed under the old name.": {
+    "Renaming a rule doesn't move files that were already filed under its old name.": {
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Renaming a category doesn't move files that were already filed under the old name."
-          }
-        },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bir kategoriyi yeniden adlandırmak, eski adla klasörlenmiş dosyaları taşımaz."
+            "value": "Bir kuralı yeniden adlandırmak, eski adla klasörlenmiş dosyaları taşımaz."
           }
         }
       }
     },
-    "Replace your categories with the defaults?": {
+    "Replace your rules with the defaults?": {
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Replace your categories with the defaults?"
-          }
-        },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kategorileriniz varsayılanlarla değiştirilsin mi?"
+            "value": "Kurallarınız varsayılanlarla değiştirilsin mi?"
           }
         }
       }
