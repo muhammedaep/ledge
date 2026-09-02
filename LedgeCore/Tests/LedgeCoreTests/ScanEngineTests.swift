@@ -104,3 +104,19 @@ private let rules = RuleSet(categories: [
 
     #expect(plan.map(\.source.lastPathComponent) == ["a.png"])
 }
+
+@Test func aPlanMarksBrowsableFoldersAndNotPackages() throws {
+    let dir = try TempDirectory()
+    try FileManager.default.createDirectory(at: dir.url.appendingPathComponent("Project"),
+                                            withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: dir.url.appendingPathComponent("Thing.app"),
+                                            withIntermediateDirectories: true)
+    try Data().write(to: dir.url.appendingPathComponent("a.png"))
+
+    let plan = ScanEngine.plan(folder: dir.url, using: .defaults)
+    func entry(_ name: String) -> PlannedMove? { plan.first { $0.source.lastPathComponent == name } }
+
+    #expect(entry("Project")?.isFolder == true)
+    #expect(entry("Thing.app")?.isFolder == false)
+    #expect(entry("a.png")?.isFolder == false)
+}

@@ -5,10 +5,20 @@ public struct PlannedMove: Identifiable, Equatable, Sendable {
     public let source: URL
     public let destination: Destination
 
-    public init(id: UUID = UUID(), source: URL, destination: Destination) {
+    /// Whether this entry is filed as one opaque unit rather than by its
+    /// extension — a browsable folder.
+    ///
+    /// A package (`.app`, `.sketch`) is moved whole too, but it is not a
+    /// *folder* to anyone reading the preview: it has an extension, a rule
+    /// claims it by that extension, and calling it a folder would say the
+    /// opposite of what happened to it.
+    public let isFolder: Bool
+
+    public init(id: UUID = UUID(), source: URL, destination: Destination, isFolder: Bool = false) {
         self.id = id
         self.source = source
         self.destination = destination
+        self.isFolder = isFolder
     }
 }
 
@@ -35,7 +45,9 @@ public enum ScanEngine {
             .compactMap { url -> PlannedMove? in
                 guard let facts = factsProvider(url) else { return nil }
                 let destination = Categorizer.destination(for: facts, in: folder, using: rules)
-                return PlannedMove(source: url, destination: destination)
+                return PlannedMove(source: url,
+                                   destination: destination,
+                                   isFolder: facts.isDirectory && !facts.isPackage)
             }
             .sorted { $0.source.lastPathComponent < $1.source.lastPathComponent }
     }
