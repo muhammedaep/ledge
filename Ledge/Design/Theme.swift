@@ -194,3 +194,20 @@ extension View {
         font(.system(size: 12))
     }
 }
+
+extension Theme {
+    /// Applies the user's appearance choice to the whole app.
+    ///
+    /// Set on the application rather than per window, because both the shelf's
+    /// panel and the Settings window have to follow it. Nothing else needs to
+    /// change: every colour in this file resolves through
+    /// `appearance.bestMatch(from: [.aqua, .darkAqua])`, so the palette follows
+    /// from this single assignment. `nil` hands control back to the system.
+    @MainActor static func apply(_ setting: AppearanceSetting) {
+        NSApplication.shared.appearance = switch setting {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
+}

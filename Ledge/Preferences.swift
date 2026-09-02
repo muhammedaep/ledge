@@ -2,6 +2,14 @@ import Foundation
 import Observation
 import ServiceManagement
 
+/// Which appearance the interface uses, whatever the system is set to.
+///
+/// `system` is the default and means "follow the system", which is what Ledge
+/// did before this setting existed — an upgrade changes nothing until asked.
+enum AppearanceSetting: String, CaseIterable {
+    case system, light, dark
+}
+
 /// User settings, persisted to `UserDefaults` on every change.
 @Observable
 final class Preferences {
@@ -10,6 +18,7 @@ final class Preferences {
         static let shelfSize = "shelfSize"
         static let automaticFiling = "automaticFilingEnabled"
         static let activeProjectID = "activeProjectID"
+        static let appearance = "appearance"
     }
 
     var watchedFolders: [URL] {
@@ -33,6 +42,10 @@ final class Preferences {
         didSet {
             UserDefaults.standard.set(activeProjectID?.uuidString, forKey: Key.activeProjectID)
         }
+    }
+
+    var appearance: AppearanceSetting {
+        didSet { UserDefaults.standard.set(appearance.rawValue, forKey: Key.appearance) }
     }
 
     var launchAtLogin: Bool {
@@ -66,6 +79,10 @@ final class Preferences {
         automaticFilingEnabled = defaults.object(forKey: Key.automaticFiling) as? Bool ?? true
         activeProjectID = defaults.string(forKey: Key.activeProjectID)
             .flatMap(UUID.init(uuidString:))
+        // An unreadable or absent value falls back to following the system,
+        // which is the behaviour every existing install already has.
+        appearance = defaults.string(forKey: Key.appearance)
+            .flatMap(AppearanceSetting.init(rawValue:)) ?? .system
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 }

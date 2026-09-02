@@ -17,6 +17,15 @@ struct GeneralPane: View {
                         enabled ? state.startWatching() : state.stopWatching()
                     }
                 Toggle("Launch at login", isOn: $preferences.launchAtLogin)
+
+                Picker("Appearance", selection: $preferences.appearance) {
+                    Text("System").tag(AppearanceSetting.system)
+                    Text("Light").tag(AppearanceSetting.light)
+                    Text("Dark").tag(AppearanceSetting.dark)
+                }
+                .onChange(of: preferences.appearance) { _, choice in
+                    Theme.apply(choice)
+                }
             }
 
             Section("Watched folders") {

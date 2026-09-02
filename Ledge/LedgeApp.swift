@@ -10,6 +10,9 @@ struct LedgeApp: App {
     init() {
         let state = AppState()
         _state = State(initialValue: state)
+        // Before any window exists, so the first paint is already correct
+        // rather than flashing the system appearance and then correcting.
+        Theme.apply(state.preferences.appearance)
         state.startWatching()
     }
 

@@ -126,6 +126,23 @@ The fix is to make the swap atomic — build the link at a sibling path and
 branch about the interface. Until then, a red run of this one test is a
 re-run, not a regression.
 
+## `ImageRenderer` cannot see the appearance setting
+
+The off-screen render this project leans on for colour evidence draws without
+a window, so it never picks up `NSApplication.shared.appearance`. Asked
+whether the Appearance setting changes a dynamic colour, it answers "no" for
+both light and dark — a false negative that would send the next person to
+rewrite a feature that works.
+
+What does answer it: make a real `NSWindow`, set the app appearance, and read
+`view.effectiveAppearance` inside
+`performAsCurrentDrawingAppearance`. Measured that way, light resolves to the
+light branch and dark to the dark one, which is how the setting was verified.
+
+`ImageRenderer` stays the right tool for "do these two states differ in
+colour" inside one appearance. It is the wrong tool for anything that depends
+on which appearance is current.
+
 ## The build is native-arch only
 
 `make build` and CI produce a binary for the machine that built them. `make

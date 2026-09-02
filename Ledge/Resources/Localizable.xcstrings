@@ -183,6 +183,22 @@
         }
       }
     },
+    "Appearance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görünüm"
+          }
+        }
+      }
+    },
     "By extension": {
       "localizations": {
         "en": {
@@ -381,6 +397,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu grup geri alınamadı."
+          }
+        }
+      }
+    },
+    "Dark": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koyu"
           }
         }
       }
@@ -719,6 +751,22 @@
         }
       }
     },
+    "Light": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Light"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık"
+          }
+        }
+      }
+    },
     "Looking through this folder…": {
       "localizations": {
         "en": {
@@ -775,22 +823,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aşağı taşı — alttaki kurallar yalnızca kalanı görür"
-          }
-        }
-      }
-    },
-    "Moving…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Moving…"
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Taşınıyor…"
           }
         }
       }
@@ -855,6 +887,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Taşınmış veya silinmiş"
+          }
+        }
+      }
+    },
+    "Moving…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moving…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taşınıyor…"
           }
         }
       }
@@ -1307,6 +1355,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alt klasörler"
+          }
+        }
+      }
+    },
+    "System": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sistem"
           }
         }
       }

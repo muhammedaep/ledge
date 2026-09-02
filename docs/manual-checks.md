@@ -233,7 +233,20 @@ None of this replaces the checks above. An interface that looks better and
 breaks the drag-out, undo, the stale row, project routing, the
 folder-as-one-unit rule or the eject lockout is a loss, not a trade.
 
-## 14. What could not be established here at all
+## 14. Appearance follows the setting, not the system
+
+Settings → General → Appearance. Set it to **Light** while your Mac is in Dark
+mode, then to **Dark** while your Mac is in Light mode. The shelf and the
+Settings window must change together, and the choice must survive quitting and
+relaunching.
+
+Then set it back to **System** and confirm Ledge follows the Mac again.
+
+This one cannot be checked off-screen. The project's usual colour evidence,
+`ImageRenderer`, renders without a window and never sees the app appearance at
+all — see `known-limitations.md`.
+
+## 15. What could not be established here at all
 
 Colour is deliberately missing from the list below. Three of the tasks that
 built this interface measured it off-screen with `ImageRenderer` — rendering

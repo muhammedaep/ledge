@@ -251,7 +251,19 @@ sürükleyip çıkarmayı, geri almayı, bayatlamış satırı, proje yönlendir
 klasörün-tek-parça kuralını ya da çıkarma kilidini bozan bir arayüz, bir
 kazanım değil, bir kayıptır.
 
-## 14. Burada hiç doğrulanamayanlar
+## 14. Görünüm ayarı sistemi değil, seçimi izliyor
+
+Ayarlar → General → Appearance. Mac'in **Koyu** moddayken **Light**'ı seç,
+**Açık** moddayken **Dark**'ı seç. Raf ve Ayarlar penceresi birlikte
+değişmeli, seçim de uygulamayı kapatıp açınca korunmalı.
+
+Sonra **System**'e geri al ve Ledge'in yine Mac'i izlediğini doğrula.
+
+Bu kontrol ekran dışında yapılamaz. Projenin her zamanki renk kanıtı olan
+`ImageRenderer` penceresiz çizdiği için uygulama görünümünü hiç görmez —
+`known-limitations.md`'ye bak.
+
+## 15. Burada hiç doğrulanamayanlar
 
 Renk, aşağıdaki listede bilerek yok. Bu arayüzü kuran görevlerden üçü rengi
 ekran dışı `ImageRenderer` ile ölçtü — gerçek görünümü render edip pikselleri
