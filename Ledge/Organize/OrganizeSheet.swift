@@ -9,28 +9,30 @@ import LedgeCore
 /// preview is the consent surface: whatever it says will happen has to be what
 /// the user is agreeing to. Two consequences run through everything below.
 ///
-/// **It shows categories and counts, never destination filenames.** The final
-/// name of a moved file is chosen inside `FileMover`'s lock at the moment of the
-/// move, and `availableURL` is not called under that lock when the preview is
-/// built — so between this list being computed and the user pressing Move, the
-/// watcher can file something into the same folder under the same name and take
-/// the name this sheet would have promised. `FileMover` still never overwrites,
-/// so nothing is lost; it just picks `report (1).pdf` instead. A category and a
-/// count are properties of the plan itself, they are exactly what the toggles
-/// select, and no concurrent filing can falsify them. A filename would be a
+/// **It shows each move's source name and its destination, never the
+/// destination filename.** The final name of a moved file is chosen inside
+/// `FileMover`'s lock at the moment of the move, and `availableURL` is not
+/// called under that lock when the preview is built — so between this list
+/// being computed and the user pressing Move, the watcher can file something
+/// into the same folder under the same name and take the name this sheet
+/// would have promised. `FileMover` still never overwrites, so nothing is
+/// lost; it just picks `report (1).pdf` instead. A source name is already
+/// sitting on disk under it, and a destination folder is chosen by
+/// `Categorizer` with no filesystem read — properties of the plan itself that
+/// no concurrent filing can falsify. A destination *filename* would be a
 /// guess dressed up as a promise.
 ///
 /// **A folder is one unit.** `ScanEngine` reads a folder at depth 1 and never
 /// descends, so a project folder is a single `PlannedMove` and moves whole or
-/// not at all. The caption says so, because from a count alone the user cannot
-/// tell whether "Other 1" means one folder or everything inside it.
+/// not at all. `PlannedMove.isFolder` says so on its own row, because a
+/// destination name alone cannot tell the user whether "HEIC" means one file
+/// or a folder full of them.
 struct OrganizeSheet: View {
     @Environment(AppState.self) private var state
     @Environment(\.dismiss) private var dismiss
 
     @State private var folder: URL?
     @State private var preview = OrganizePreview(plan: [])
-    @State private var excluded: Set<String> = []
     @State private var isScanning = false
 
     /// This sheet's own window, so the refresh below can tell its panel becoming
@@ -95,25 +97,17 @@ struct OrganizeSheet: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Organize Now").font(.headline)
+            Text("Organize Now").titleText()
 
-            Text("Folders move whole — Ledge never looks inside them.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("Nothing is overwritten. A name already in use gets a number.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text("\(preview.plan.count) items would move. Folders move whole — Ledge never files their contents.")
+                .rowMeta()
+                .fixedSize(horizontal: false, vertical: true)
 
             if let target = targetFolder {
                 Picker("Folder", selection: Binding(
                     get: { target },
                     set: { newFolder in
                         folder = newFolder
-                        // Exclusions name categories in *this* folder's plan.
-                        // Carried across, one for a category the new folder has
-                        // no row for would be an invisible rule with nothing on
-                        // screen to explain it.
-                        excluded = []
                         rescanToken += 1
                     }
                 )) {
@@ -148,20 +142,30 @@ struct OrganizeSheet: View {
                     ? "Looking through this folder…"
                     : "Nothing left to organize in this folder.")
         } else {
-            List(preview.groups) { group in
-                Toggle(isOn: binding(for: group.category)) {
-                    HStack {
-                        Text(group.category)
-                        Spacer()
-                        Text("\(group.count)")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
+            List(preview.plan) { item in
+                HStack(spacing: 8) {
+                    Text(item.source.lastPathComponent)
+                        .fieldText()
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 12)
+                    Text(destinationLabel(for: item))
+                        .rowMeta()
+                        .lineLimit(1)
                 }
-                .disabled(isMoving)
             }
             .frame(height: 260)
         }
+    }
+
+    /// Where one planned move lands, said the way the shelf says it.
+    ///
+    /// A folder is named as a whole rather than given a destination trail,
+    /// because Ledge never looks inside one and a trail would imply it had.
+    private func destinationLabel(for item: PlannedMove) -> String {
+        item.isFolder
+            ? String(localized: "\(item.destination.category) · whole folder")
+            : item.destination.folder.lastPathComponent
     }
 
     private var footer: some View {
@@ -169,10 +173,14 @@ struct OrganizeSheet: View {
             // Offered only when the batch actually moved something.
             // `UndoService.undoBatch` finds no records for a batch where every
             // move failed and returns quietly, so the button would report
-            // success having put nothing back.
+            // success having put nothing back. Until there is one, the
+            // reassurance the design gives before the fact stands in its place.
             if let outcome = state.lastOrganizeOutcome, outcome.isUndoable {
                 Button("Undo Last Batch") { undo(outcome.id) }
                     .disabled(isMoving)
+            } else {
+                Text("One undo restores the whole batch")
+                    .rowMeta()
             }
             outcomeSummary
             Spacer()
@@ -187,9 +195,9 @@ struct OrganizeSheet: View {
             // when the sheet is reopened.
             Button(isMoving ? "Close" : "Cancel") { dismiss() }
                 .keyboardShortcut(.cancelAction)
-            Button(action: startMove) { Text(moveButtonTitle) }
+            Button("Move \(movableCount) Items", action: startMove)
                 .keyboardShortcut(.defaultAction)
-                .disabled(isMoving || preview.selectedCount(excluding: excluded) == 0)
+                .disabled(movableCount == 0 || isMoving)
         }
         .padding(12)
     }
@@ -203,8 +211,7 @@ struct OrganizeSheet: View {
             Text(outcome.isPartial
                  ? "Moved \(outcome.moved) of \(outcome.attempted)."
                  : "Moved \(outcome.moved).")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .rowMeta()
                 .padding(.leading, 4)
         }
     }
@@ -230,24 +237,13 @@ struct OrganizeSheet: View {
             .padding(.vertical, 40)
     }
 
-    private var moveButtonTitle: LocalizedStringKey {
-        isMoving ? "Moving…" : "Move \(preview.selectedCount(excluding: excluded))"
-    }
+    /// Every planned move the button promises — including the ones landing in
+    /// the fallback category. The boards count unclaimed files out of the
+    /// button because they leave them in place; Ledge moves them, so it
+    /// counts them here (spec §8.1).
+    private var movableCount: Int { preview.plan.count }
 
     // MARK: - Actions
-
-    private func binding(for category: String) -> Binding<Bool> {
-        Binding(
-            get: { !excluded.contains(category) },
-            set: { isOn in
-                if isOn {
-                    excluded.remove(category)
-                } else {
-                    excluded.insert(category)
-                }
-            }
-        )
-    }
 
     /// `moves` is captured before the batch starts, so what runs is the list the
     /// user was looking at when they agreed to it — not whatever a rescan
@@ -257,7 +253,7 @@ struct OrganizeSheet: View {
     /// finishes correctly even if the sheet is dismissed while it runs.
     private func startMove() {
         guard let root = targetFolder else { return }
-        let moves = preview.selectedMoves(excluding: excluded)
+        let moves = preview.plan
         Task {
             await state.apply(moves, root: root)
             rescanToken += 1

@@ -17,6 +17,16 @@
         }
       }
     },
+    "%@ · whole folder": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · klasörün tamamı"
+          }
+        }
+      }
+    },
     "%lld": {
       "localizations": {
         "en": {
@@ -29,6 +39,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld"
+          }
+        }
+      }
+    },
+    "%lld items would move. Folders move whole — Ledge never files their contents.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld öğe taşınacak. Klasörler bütün halinde taşınır — Ledge içlerini klasörlemez."
           }
         }
       }
@@ -551,22 +571,6 @@
         }
       }
     },
-    "Folders move whole — Ledge never looks inside them.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Folders move whole — Ledge never looks inside them."
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Klasörler bütün halinde taşınır — Ledge içlerine bakmaz."
-          }
-        }
-      }
-    },
     "General": {
       "localizations": {
         "en": {
@@ -723,14 +727,8 @@
         }
       }
     },
-    "Move %lld": {
+    "Move %lld Items": {
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Move %lld"
-          }
-        },
         "tr": {
           "stringUnit": {
             "state": "translated",
@@ -815,22 +813,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Taşınmış veya silinmiş"
-          }
-        }
-      }
-    },
-    "Moving…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Moving…"
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Taşınıyor…"
           }
         }
       }
@@ -965,22 +947,6 @@
         }
       }
     },
-    "Nothing is overwritten. A name already in use gets a number.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nothing is overwritten. A name already in use gets a number."
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hiçbir şeyin üzerine yazılmaz. Kullanımda olan bir ada numara eklenir."
-          }
-        }
-      }
-    },
     "Nothing left to organize in this folder.": {
       "localizations": {
         "en": {
@@ -993,6 +959,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu klasörde düzenlenecek bir şey kalmadı."
+          }
+        }
+      }
+    },
+    "One undo restores the whole batch": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tek geri alma tüm grubu geri getirir"
           }
         }
       }
