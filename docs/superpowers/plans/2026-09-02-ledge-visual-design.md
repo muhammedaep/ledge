@@ -25,6 +25,14 @@
 - Every test must be demonstrated to fail against the defect it was written for. Break the line, run the test, watch it fail, restore, run again. Record both runs in the task report.
 - Gate before every commit: `cd LedgeCore && swift test`, then `make build`, then `make strings`.
 
+## New files do not reach the build on their own
+
+`Ledge.xcodeproj` has no `PBXFileSystemSynchronizedRootGroup`; it lists every file explicitly. A new `.swift` file under `Ledge/` therefore needs four hand edits to `Ledge.xcodeproj/project.pbxproj`: a `PBXFileReference`, a `PBXBuildFile`, membership in the group its directory belongs to, and an entry in the target's Sources build phase. Copy the shape of an existing entry — `Ledge/Shelf/ShelfRow.swift` is a good model — and give each new object a fresh 24-character hex id.
+
+`LedgeCore` is a **local Swift package** and globs its own `Sources/` directory, so a new file there needs none of this. Task 1 is the only task that adds one.
+
+If a file is missing from the build phase the compiler will not say so; it will fail later, in whichever file first refers to the symbol that was never compiled.
+
 ## Nothing here can be seen
 
 No agent on this project has had Screen Recording or Accessibility permission. Every task below ships unverified as *rendered*. Do not claim you checked how something looks. Report what you built and that it compiles; a human looks at it afterwards. Task 9 writes down what that human must check.
@@ -214,6 +222,7 @@ Spec §2, §3, §4. This file is the only place in the app allowed to contain a 
 Create `Ledge/Design/Theme.swift`:
 
 ```swift
+import AppKit
 import SwiftUI
 
 /// The design's scale, in one place.
@@ -259,22 +268,58 @@ enum Theme {
 
     enum Colour {
         /// The four the system has no equivalent for.
-        static let chipFill = Color("ChipFill", bundle: .main)
-        static let chipBorder = Color("ChipBorder", bundle: .main)
-        static let fieldFill = Color("FieldFill", bundle: .main)
-        static let fieldBorder = Color("FieldBorder", bundle: .main)
+        static let chipFill = dynamic(light: white(1, 0.72), dark: white(1, 0.075))
+        static let chipBorder = dynamic(light: white(0, 0.07), dark: white(1, 0.07))
+        static let fieldFill = dynamic(light: white(1, 1), dark: white(1, 0.06))
+        static let fieldBorder = dynamic(light: white(0, 0.14), dark: white(1, 0.14))
 
         /// Hue is reserved for meaning: blue is actionable, amber is a warning,
         /// red is a rule that will never work.
-        static let accent = Color("Accent", bundle: .main)
-        static let amber = Color("Amber", bundle: .main)
-        static let amberFill = Color("AmberFill", bundle: .main)
-        static let red = Color("Red", bundle: .main)
-        static let redFill = Color("RedFill", bundle: .main)
+        static let accent = dynamic(light: srgb(0x0a6cd6), dark: srgb(0x409cff))
+        static let amber = dynamic(light: srgb(0x8a5d00), dark: srgb(0xffd60a))
+        static let amberFill = dynamic(light: srgb(0xffc400, 0.14), dark: srgb(0xffd60a, 0.10))
+        static let red = dynamic(light: srgb(0xc4322a), dark: srgb(0xff6961))
+        static let redFill = dynamic(light: srgb(0xff3b30, 0.09), dark: srgb(0xff6961, 0.12))
+
+        /// The badge families — see the type badge. Page, border, label.
+        static let badgeDocPage = dynamic(light: srgb(0xfdeceb), dark: srgb(0xff6961, 0.14))
+        static let badgeDocBorder = dynamic(light: srgb(0xeec0bc), dark: srgb(0xff6961, 0.28))
+        static let badgeDocLabel = dynamic(light: srgb(0xc4544c), dark: srgb(0xef9a92))
+        static let badgeImagePage = dynamic(light: srgb(0xeaf3fd), dark: srgb(0x82b4ec, 0.14))
+        static let badgeImageBorder = dynamic(light: srgb(0xbcd6f2), dark: srgb(0x82b4ec, 0.28))
+        static let badgeImageLabel = dynamic(light: srgb(0x3b74b5), dark: srgb(0x82b4ec))
+        static let badgeMoviePage = dynamic(light: srgb(0xf0ebfb), dark: srgb(0xc3a3ef, 0.14))
+        static let badgeMovieBorder = dynamic(light: srgb(0xd0c2ee), dark: srgb(0xc3a3ef, 0.28))
+        static let badgeMovieLabel = dynamic(light: srgb(0x7a5bc0), dark: srgb(0xc3a3ef))
 
         /// One neutral in both themes, so a hover never has to know the theme.
         static let hover = Color(white: 0.5, opacity: 0.16)
         static let hoverStrong = Color(white: 0.5, opacity: 0.18)
+
+        /// A colour that answers differently in each theme.
+        ///
+        /// In Swift rather than an asset catalog on purpose. This target has no
+        /// catalog and its project file lists every resource by hand, so adding
+        /// one is project-file surgery — and a catalog colour whose name is
+        /// wrong does not fail the build, it renders as a placeholder at
+        /// runtime. Nobody on this project can see runtime. Here a typo is a
+        /// compile error.
+        private static func dynamic(light: NSColor, dark: NSColor) -> Color {
+            Color(nsColor: NSColor(name: nil) { appearance in
+                appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
+            })
+        }
+
+        private static func srgb(_ hex: UInt32, _ alpha: CGFloat = 1) -> NSColor {
+            NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
+                    green: CGFloat((hex >> 8) & 0xFF) / 255,
+                    blue: CGFloat(hex & 0xFF) / 255,
+                    alpha: alpha)
+        }
+
+        private static func white(_ value: CGFloat, _ alpha: CGFloat) -> NSColor {
+            NSColor(white: value, alpha: alpha)
+        }
     }
 }
 
@@ -311,35 +356,21 @@ extension View {
 }
 ```
 
-- [ ] **Step 2: Add the nine colours to the asset catalog**
+- [ ] **Step 2: Register the file in the project**
 
-The nine `Color(...)` names above need entries in `Ledge/Resources/Assets.xcassets`, each with an Any (light) and a Dark appearance. Create the catalog if the target does not have one, and add it to the target's resources in `Ledge.xcodeproj`.
-
-Values, from spec §4 — sRGB, with alpha:
-
-| Name | Light | Dark |
-|---|---|---|
-| `ChipFill` | `255,255,255` @ 0.72 | `255,255,255` @ 0.075 |
-| `ChipBorder` | `0,0,0` @ 0.07 | `255,255,255` @ 0.07 |
-| `FieldFill` | `255,255,255` @ 1.0 | `255,255,255` @ 0.06 |
-| `FieldBorder` | `0,0,0` @ 0.14 | `255,255,255` @ 0.14 |
-| `Accent` | `#0a6cd6` @ 1.0 | `#409cff` @ 1.0 |
-| `Amber` | `#8a5d00` @ 1.0 | `#ffd60a` @ 1.0 |
-| `AmberFill` | `255,196,0` @ 0.14 | `255,214,10` @ 0.10 |
-| `Red` | `#c4322a` @ 1.0 | `#ff6961` @ 1.0 |
-| `RedFill` | `255,59,48` @ 0.09 | `255,105,97` @ 0.12 |
+`Theme.swift` is a new file under `Ledge/` and the project lists files by hand — see "New files do not reach the build on their own" above. Add its `PBXFileReference`, `PBXBuildFile`, group membership and Sources entry, modelled on an existing file.
 
 - [ ] **Step 3: Build**
 
 Run: `make build`, then `make strings`
 Expected: build succeeds; all three string checks OK. `Theme.swift` contains no user-visible strings, so the catalog is unchanged.
 
-If a colour name fails to resolve at build time it will not error — SwiftUI falls back to a placeholder at *runtime*. Verify each of the nine exists in the asset catalog by reading the catalog's directory listing, and say in your report that you did.
+Then prove the file is actually compiled — a file missing from the build phase produces no error until something references it. Add `_ = Theme.Colour.accent` temporarily inside `ShelfView.body`, build, confirm it succeeds, and remove it. Report that you did.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Ledge/Design/Theme.swift Ledge/Resources/Assets.xcassets Ledge.xcodeproj
+git add Ledge/Design/Theme.swift Ledge.xcodeproj
 git commit -m "feat: the design's scale, in one file"
 ```
 
@@ -386,11 +417,11 @@ struct TypeBadge: View {
     private var palette: (page: Color, border: Color, label: Color) {
         switch kind {
         case .image:
-            return (Color("BadgeImagePage"), Color("BadgeImageBorder"), Color("BadgeImageLabel"))
+            return (Theme.Colour.badgeImagePage, Theme.Colour.badgeImageBorder, Theme.Colour.badgeImageLabel)
         case .movie:
-            return (Color("BadgeMoviePage"), Color("BadgeMovieBorder"), Color("BadgeMovieLabel"))
+            return (Theme.Colour.badgeMoviePage, Theme.Colour.badgeMovieBorder, Theme.Colour.badgeMovieLabel)
         case .document:
-            return (Color("BadgeDocPage"), Color("BadgeDocBorder"), Color("BadgeDocLabel"))
+            return (Theme.Colour.badgeDocPage, Theme.Colour.badgeDocBorder, Theme.Colour.badgeDocLabel)
         case .other:
             return (Theme.Colour.chipFill, Theme.Colour.chipBorder, Color.secondary)
         }
@@ -445,31 +476,21 @@ private struct PageShape: Shape {
 }
 ```
 
-- [ ] **Step 2: Add the nine badge colours to the asset catalog**
+- [ ] **Step 2: Register the file in the project**
 
-| Name | Light | Dark |
-|---|---|---|
-| `BadgeDocPage` | `#fdeceb` | `255,105,97` @ 0.14 |
-| `BadgeDocBorder` | `#eec0bc` | `255,105,97` @ 0.28 |
-| `BadgeDocLabel` | `#c4544c` | `#ef9a92` |
-| `BadgeImagePage` | `#eaf3fd` | `130,180,236` @ 0.14 |
-| `BadgeImageBorder` | `#bcd6f2` | `130,180,236` @ 0.28 |
-| `BadgeImageLabel` | `#3b74b5` | `#82b4ec` |
-| `BadgeMoviePage` | `#f0ebfb` | `195,163,239` @ 0.14 |
-| `BadgeMovieBorder` | `#d0c2ee` | `195,163,239` @ 0.28 |
-| `BadgeMovieLabel` | `#7a5bc0` | `#c3a3ef` |
+`TypeBadge.swift` is a new file under `Ledge/` — add its four `project.pbxproj` entries, as Task 2 did for `Theme.swift`.
 
-The design draws the light page fills literally and the dark labels literally; the dark page and border are derived from the dark label at 14% and 28%, because the boards draw dark badges as a label on the panel's own ground rather than a filled page. Say in your report that this derivation is yours, not the design's.
+The nine badge colours it reads are already in `Theme.Colour`; Task 2 put them there. The design draws the light pages literally and the dark labels literally, and the dark page and border are derived from the dark label at 14% and 28% — the boards draw dark badges as a label on the panel's own ground rather than a filled page. That derivation is this plan's, not the design's, and belongs in the report.
 
 - [ ] **Step 3: Build**
 
 Run: `make build`, then `make strings`
-Expected: both clean. Confirm all nine colour names exist in the asset catalog by listing it.
+Expected: both clean.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Ledge/Shelf/TypeBadge.swift Ledge/Resources/Assets.xcassets
+git add Ledge/Shelf/TypeBadge.swift Ledge.xcodeproj
 git commit -m "feat: the drawn type badge"
 ```
 
@@ -610,10 +631,19 @@ and use it in `metadata`:
     }
 ```
 
-`ShelfView` supplies it in Task 5 by matching `record.to` against each known
-project's folder — a project owns a folder, and a record filed under one has a
-destination inside it. If no project's folder contains the destination, the
-row is not a project row and the value is nil.
+A stored `let` cannot carry a default a caller may override, so adding it
+breaks `ShelfView`'s call site and with it this task's own build gate. Pass a
+literal there for now — in `ShelfView.swift`, inside the `ShelfRow(...)` call:
+
+```swift
+                                projectName: nil,
+```
+
+Task 5 replaces that literal with the real lookup, which matches `record.to`
+against each known project's folder: a project owns a folder, and a record
+filed under one has a destination inside it. Leaving it `nil` for one commit
+costs a row its project name until Task 5 lands, and keeps every revision on
+the branch building.
 
 - [ ] **Step 2: Delete the now-unused icon parameter's use**
 
