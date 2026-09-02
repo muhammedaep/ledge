@@ -23,6 +23,7 @@
 		A1B2C3D400114455AA66001D /* ErrorBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66001C /* ErrorBanner.swift */; };
 		A1B2C3D400114455AA66001F /* WindowReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66001E /* WindowReader.swift */; };
 		906E66B5C4674E7B3F07D17C /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49DA3A7BF2DC04291BDF8698 /* Theme.swift */; };
+		52286C449C66870DCBEFD97C /* TypeBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D1051BDFDC83E7FE504853B /* TypeBadge.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 		A1B2C3D400114455AA660017 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		A1B2C3D400114455AA66001A /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		49DA3A7BF2DC04291BDF8698 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		6D1051BDFDC83E7FE504853B /* TypeBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypeBadge.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -96,6 +98,7 @@
 			children = (
 				79F2B1F6E27F4C7DAA626279 /* ShelfView.swift */,
 				A1B2C3D400114455AA660008 /* ShelfRow.swift */,
+				6D1051BDFDC83E7FE504853B /* TypeBadge.swift */,
 			);
 			path = Shelf;
 			sourceTree = "<group>";
@@ -232,6 +235,7 @@
 				A1B2C3D400114455AA660013 /* PermissionView.swift in Sources */,
 				A1B2C3D400114455AA660016 /* RulesPane.swift in Sources */,
 				906E66B5C4674E7B3F07D17C /* Theme.swift in Sources */,
+				52286C449C66870DCBEFD97C /* TypeBadge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
