@@ -16,6 +16,8 @@ struct ShelfView: View {
     /// banner's action — `SettingsLink` is a view and cannot be called from one.
     @Environment(\.openSettings) private var openSettings
     @State private var showingOrganize = false
+    /// Height the rows want, measured; the shelf clamps it to 340.
+    @State private var rowsHeight: CGFloat = 0
 
     /// Liveness per record id, refreshed whenever the shelf appears.
     ///
@@ -192,7 +194,7 @@ struct ShelfView: View {
                 .padding(.vertical, 22)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: Theme.Space.rowGap) {
+                    VStack(spacing: Theme.Space.rowGap) {
                         ForEach(state.recentRecords) { record in
                             // Until the first sweep lands, a row shows as
                             // present: the display is briefly optimistic, while
@@ -211,8 +213,32 @@ struct ShelfView: View {
                     }
                     .padding(.horizontal, 8)
                     .padding(.bottom, 8)
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: RowsHeight.self, value: proxy.size.height)
+                        }
+                    )
                 }
-                .frame(maxHeight: 340)
+                // Measured, then clamped — neither half is optional.
+                //
+                // `MenuBarExtra(style: .window)` sizes its panel from the
+                // content's ideal height, and a `ScrollView` has no ideal
+                // height of its own: it takes what it is proposed, and here it
+                // is proposed zero. Shipped, that resolved to {360, 0} and no
+                // row rendered at all while the shelf still held ten records.
+                //
+                // `fixedSize` looks like the fix and is not: it makes the view
+                // ignore *every* proposal, including the `maxHeight` cap, so a
+                // ten-row shelf drew 475pt over its own header and footer.
+                // Both states were measured from the running panel's view tree.
+                //
+                // So the content reports its own height and this frame clamps
+                // it. `VStack`, not `LazyVStack`: a lazy stack inside a
+                // zero-height scroll view renders nothing and would report zero
+                // forever, which is the deadlock this measurement must avoid.
+                .frame(height: min(rowsHeight, 340))
+                .onPreferenceChange(RowsHeight.self) { rowsHeight = $0 }
             }
         }
     }
@@ -249,7 +275,17 @@ struct ShelfView: View {
 
             Spacer()
 
-            SettingsLink {
+            // Not `SettingsLink`, which opens the window without raising it.
+            // Ledge is an accessory app (LSUIElement) and is never frontmost
+            // while the shelf is open, so Settings appeared *behind* whatever
+            // the user was working in — reported from a real run. The banner's
+            // button below and `chooseProject()` already pair `activate` with
+            // the action for exactly this reason; this is the third case, and
+            // it was the one anybody would actually click.
+            Button {
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                openSettings()
+            } label: {
                 Image(systemName: "gearshape")
                     .frame(width: 28, height: Theme.Size.button)
             }
@@ -551,5 +587,14 @@ struct ShelfView: View {
         // destination with no explanation.
         guard choice.wasAlreadyKnown || state.updateProjects(choice.projects) else { return }
         state.setActiveProject(choice.project)
+    }
+}
+
+/// The rows' natural height, reported up so the scroll view can be given a
+/// definite one. See the note at the `frame` that consumes it.
+private struct RowsHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
