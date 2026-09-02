@@ -167,6 +167,11 @@ Settings → Rules. Pick a rule you have not touched — Videos, say. Change its
 Subfolders to By month, save, reopen. If you cannot get at the control, that
 is the defect.
 
+Do it once with the pointer, then again with **Tab** alone. Both routes were
+dead before the fix, and neither has been tried by hand since — the account of
+how the keyboard one behaves came from reading the view tree, not from pressing
+the key.
+
 This is the check that would have caught a clean rule card, once collapsed,
 never being reopenable again — nine of the ten default rules ship exactly
 that way, with no other route to their Subfolders picker.

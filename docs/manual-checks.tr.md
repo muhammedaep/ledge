@@ -179,6 +179,10 @@ Settings → Rules (Ayarlar → Kurallar). Hiç dokunmadığın bir kural seç �
 mesela Videos. Alt klasörler ayarını By month (Aya göre) yap, kaydet,
 tekrar aç. Kontrole erişemiyorsan, kusur budur.
 
+Bir kez işaretçiyle, bir kez de yalnızca **Tab** ile yap. Düzeltmeden önce iki
+yol da ölüydü ve o zamandan beri ikisi de elle denenmedi — klavye yolunun nasıl
+davrandığına dair anlatı, tuşa basmaktan değil, görünüm ağacını okumaktan geldi.
+
 Bu, temiz bir kural kartının bir kez daraldıktan sonra bir daha asla
 açılamadığı hatayı yakalayacak kontrol — varsayılan on kuraldan dokuzu,
 Alt klasörler seçicisine başka hiçbir yol olmadan, tam olarak bu haldeyken
