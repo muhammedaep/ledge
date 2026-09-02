@@ -99,6 +99,33 @@ real unverified-as-rendered list, and it is not shrunk by the above.
 `docs/manual-checks.md` is the list. The drag-out itself was confirmed by hand
 early on; nothing else on it was.
 
+## One test is flaky, and the product code is not at fault
+
+`aFileReplacedByADanglingSymlinkMidSettleIsNotIgnored`
+(`DownloadSettlerTests.swift:476`) fails roughly one run in six. It was flaky
+before the visual-design branch, which touches neither the settler nor its
+tests.
+
+The cause is in the test, not in `DownloadSettler`. The test simulates a file
+being *replaced* by a dangling symlink using two calls:
+
+```swift
+try FileManager.default.removeItem(at: file)
+try FileManager.default.createSymbolicLink(...)
+```
+
+Between them the path does not exist at all. The settler samples every 50 ms,
+and when a sample lands in that window it returns `.ignored` — which is the
+right answer to what it actually saw. The guard being tested
+(`DownloadSettler.swift:88`, `FileEntry.exists` rather than `fileExists`, so a
+dangling link counts as present) is correct and is doing its job; the test just
+does not present it with the atomic replacement it claims to.
+
+The fix is to make the swap atomic — build the link at a sibling path and
+`replaceItemAt` — which belongs in a change to the settler's tests, not in a
+branch about the interface. Until then, a red run of this one test is a
+re-run, not a regression.
+
 ## The build is native-arch only
 
 `make build` and CI produce a binary for the machine that built them. `make
