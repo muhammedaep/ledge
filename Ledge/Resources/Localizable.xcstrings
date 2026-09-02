@@ -219,16 +219,6 @@
         }
       }
     },
-    "Categories are matched top to bottom. The first one that claims a file wins.": {
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kategoriler yukarıdan aşağıya denenir. Bir dosyayı ilk sahiplenen kural kazanır."
-          }
-        }
-      }
-    },
     "Choose Folder Again…": {
       "localizations": {
         "tr": {
@@ -431,6 +421,16 @@
         }
       }
     },
+    "EXTENSIONS": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UZANTILAR"
+          }
+        }
+      }
+    },
     "Each Download's Own Folder": {
       "localizations": {
         "en": {
@@ -499,18 +499,12 @@
         }
       }
     },
-    "Extensions": {
+    "Everything else goes to %@": {
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Extensions"
-          }
-        },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uzantılar"
+            "value": "Geri kalan her şey %@ klasörüne gider"
           }
         }
       }
@@ -863,6 +857,16 @@
         }
       }
     },
+    "NAME PATTERNS · ONE PER LINE": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AD DESENLERİ · SATIR BAŞINA BİR TANE"
+          }
+        }
+      }
+    },
     "Name": {
       "localizations": {
         "en": {
@@ -875,16 +879,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ad"
-          }
-        }
-      }
-    },
-    "Name patterns — one per line, * matches anything": {
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ad desenleri — satır başına bir tane, * her şeyi karşılar"
           }
         }
       }
@@ -1245,6 +1239,16 @@
         }
       }
     },
+    "Rules apply top to bottom — the first rule that claims a file wins.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kurallar yukarıdan aşağıya uygulanır — dosyayı ilk sahiplenen kural kazanır."
+          }
+        }
+      }
+    },
     "Save": {
       "localizations": {
         "en": {
@@ -1481,6 +1485,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kurallar dosyanız okunamadı, Ledge varsayılanlara döndü. Eski dosya silinmedi, adı değiştirildi."
+          }
+        }
+      }
+    },
+    "no extensions": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "uzantı yok"
           }
         }
       }

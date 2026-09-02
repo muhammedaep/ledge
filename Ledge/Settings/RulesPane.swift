@@ -74,7 +74,11 @@ struct RulesPane: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text("Categories are matched top to bottom. The first one that claims a file wins.")
+            Text("Rules apply top to bottom — the first rule that claims a file wins.")
+                .rowMeta()
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, Theme.Space.panel)
+                .padding(.bottom, 8)
             Text("Renaming a category doesn't move files that were already filed under the old name.")
         }
         .font(.caption)
@@ -139,6 +143,9 @@ struct RulesPane: View {
             }
             Button("Reset to Defaults") { confirmingReset = true }
 
+            Text("Everything else goes to \(draft.fallbackName)")
+                .rowMeta()
+
             Spacer()
 
             // A failed save is reported here, next to the button that failed.
@@ -183,9 +190,10 @@ struct RulesPane: View {
     /// Where a category sits, so a row can tell whether it has anywhere to move.
     private func position(of id: Category.ID) -> RowPosition {
         guard let index = draft.categories.firstIndex(where: { $0.id == id }) else {
-            return RowPosition(canMoveUp: false, canMoveDown: false)
+            return RowPosition(index: 0, canMoveUp: false, canMoveDown: false)
         }
         return RowPosition(
+            index: index,
             canMoveUp: index > 0,
             canMoveDown: index < draft.categories.count - 1
         )
@@ -287,6 +295,9 @@ struct RulesPane: View {
 /// Whether this row has anywhere to move. Computed by the pane, which is the
 /// only thing that knows the order.
 private struct RowPosition: Equatable {
+    /// Zero-based, so the gutter can show `index + 1`. Precedence is the whole
+    /// point of this pane and the number is how the user reads it.
+    let index: Int
     let canMoveUp: Bool
     let canMoveDown: Bool
 }
@@ -301,10 +312,22 @@ private struct MessageList: View {
 
     var body: some View {
         ForEach(messages, id: \.self) { message in
-            Text(message.text)
-                .font(.caption)
-                .foregroundStyle(message.isBlocking ? Color.red : Color.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: message.isBlocking ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
+                    .font(.system(size: 10))
+                Text(message.text)
+                    .font(.system(size: 11))
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(message.isBlocking ? Theme.Colour.red : Theme.Colour.amber)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
+            .background {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(message.isBlocking ? Theme.Colour.redFill : Theme.Colour.amberFill)
+            }
+            .padding(.top, 7)
         }
     }
 }
@@ -426,71 +449,155 @@ private struct CategoryRow: View {
         if typedPatterns != stored { typedPatterns = stored }
     }
 
+    /// Whether either field has the keyboard. A card being typed into must
+    /// never collapse under the cursor.
+    private var isEditing: Bool { isEditingExtensions || isEditingPatterns }
+
+    /// A clean rule with nothing to say collapses to its name and its
+    /// extensions. It expands the moment it has patterns to show or a
+    /// diagnostic to raise — the two cases where the fields are the point.
+    private var isExpanded: Bool {
+        isEditing || !category.namePatterns.isEmpty || !messages.isEmpty
+    }
+
+    /// What a collapsed card shows in place of its fields.
+    private var collapsedSummary: String {
+        category.extensions.isEmpty
+            ? String(localized: "no extensions")
+            : category.extensions.joined(separator: " ")
+    }
+
+    /// The extensions field, the patterns editor, the subfolder picker and
+    /// every diagnostic this row has to raise. Hidden while the card is
+    /// collapsed — see `isExpanded`.
+    @ViewBuilder
+    private var fieldsAndDiagnostics: some View {
+        Text("EXTENSIONS")
+            .fieldLabel()
+        // `String()` rather than the `""` literal: an empty string literal
+        // still resolves to the `LocalizedStringKey` overload, and the
+        // compiler extracts it as a catalog key of its own — an empty title
+        // with nothing to translate, failing `make strings` for a key that
+        // says nothing. Passing an already-typed `String` selects the
+        // `StringProtocol` overload instead, which isn't extracted at all.
+        // The field needs no placeholder: the caption above already names it.
+        TextField(String(), text: $typedExtensions)
+            .textFieldStyle(.plain)
+            .mono()
+            .padding(.horizontal, 6)
+            .frame(height: Theme.Size.field)
+            .background {
+                RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+                    .fill(Theme.Colour.fieldFill)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+                    .stroke(Theme.Colour.fieldBorder, lineWidth: 1)
+            }
+            .focused($isEditingExtensions)
+            .onSubmit(tidy)
+
+        MessageList(messages: rewriteNotes)
+
+        // A TextEditor rather than TextField(axis: .vertical): on macOS
+        // Return in a vertical TextField submits rather than inserting a
+        // newline, and a newline is this field's separator (see
+        // `Category.parseNamePatterns`). A control the user cannot type
+        // the separator into is not a control.
+        VStack(alignment: .leading, spacing: 2) {
+            Text("NAME PATTERNS · ONE PER LINE")
+                .fieldLabel()
+            TextEditor(text: $typedPatterns)
+                .mono()
+                .scrollContentBackground(.hidden)
+                .frame(height: 46)
+                .padding(4)
+                .background {
+                    RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+                        .fill(Theme.Colour.fieldFill)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+                        .stroke(Theme.Colour.fieldBorder, lineWidth: 1)
+                }
+                .focused($isEditingPatterns)
+        }
+
+        HStack(spacing: 6) {
+            Text("Subfolders")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Picker("Subfolders", selection: $category.subdivision) {
+                Text("None").tag(Subdivision.none)
+                Text("By extension").tag(Subdivision.byExtension)
+                Text("By month").tag(Subdivision.byMonth)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
+
+        MessageList(messages: messages)
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: Theme.Space.card) {
+            VStack(spacing: 6) {
+                Text("\(position.index + 1)")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
+
+                Button { move(-1) } label: {
+                    Image(systemName: "chevron.up").font(.system(size: 9, weight: .bold))
+                }
+                .disabled(!position.canMoveUp)
+                .help("Move up — earlier rules win ties")
+
+                Button { move(1) } label: {
+                    Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+                }
+                .disabled(!position.canMoveDown)
+                .help("Move down — later rules only see what's left")
+            }
+            .buttonStyle(ArrowButtonStyle())
+            .frame(width: 20)
+            .padding(.top, 2)
+
             VStack(alignment: .leading, spacing: 6) {
                 TextField("Name", text: $category.name)
                     .textFieldStyle(.plain)
-                    .font(.body.weight(.medium))
+                    .rowName()
+                    .fontWeight(.medium)
 
-                TextField("Extensions", text: $typedExtensions)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption.monospaced())
-                    .focused($isEditingExtensions)
-                    .onSubmit(tidy)
-
-                MessageList(messages: rewriteNotes)
-
-                // A TextEditor rather than TextField(axis: .vertical): on macOS
-                // Return in a vertical TextField submits rather than inserting a
-                // newline, and a newline is this field's separator (see
-                // `Category.parseNamePatterns`). A control the user cannot type
-                // the separator into is not a control.
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Name patterns — one per line, * matches anything")
-                        .font(.caption2)
+                if isExpanded {
+                    fieldsAndDiagnostics
+                } else {
+                    Text(collapsedSummary)
+                        .mono()
                         .foregroundStyle(.secondary)
-                    TextEditor(text: $typedPatterns)
-                        .font(.caption.monospaced())
-                        .scrollContentBackground(.hidden)
-                        .frame(height: 46)
-                        .padding(4)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 5)
-                                .strokeBorder(.separator)
-                        }
-                        .focused($isEditingPatterns)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
-
-                HStack(spacing: 6) {
-                    Text("Subfolders")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Picker("Subfolders", selection: $category.subdivision) {
-                        Text("None").tag(Subdivision.none)
-                        Text("By extension").tag(Subdivision.byExtension)
-                        Text("By month").tag(Subdivision.byMonth)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                }
-
-                MessageList(messages: messages)
             }
 
-            VStack(spacing: 2) {
-                Button { move(-1) } label: { Image(systemName: "chevron.up") }
-                    .disabled(!position.canMoveUp)
-                    .help("Move up — earlier rules win ties")
-                Button { move(1) } label: { Image(systemName: "chevron.down") }
-                    .disabled(!position.canMoveDown)
-                    .help("Move down — later rules only see what's left")
-                Button(role: .destructive, action: remove) {
-                    Image(systemName: "minus.circle")
-                }
-                .help("Remove this category")
+            Spacer(minLength: 4)
+
+            Button(role: .destructive, action: remove) {
+                Image(systemName: "minus.circle").font(.system(size: 11))
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Remove this category")
+        }
+        .padding(.vertical, 9)
+        .padding(.horizontal, Theme.Space.card)
+        .background {
+            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                .fill(Theme.Colour.chipFill)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                .stroke(Theme.Colour.chipBorder, lineWidth: 1)
         }
         // The draft is kept current on every keystroke, so clicking Save
         // without leaving the field still saves what is on screen.
@@ -540,5 +647,18 @@ private struct CategoryRow: View {
             tidy()
             tidyPatterns()
         }
+    }
+}
+
+/// The 20×18 reorder buttons in a rule card's gutter.
+private struct ArrowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: 20, height: 18)
+            .background {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color(white: 0.5, opacity: configuration.isPressed ? 0.22 : 0.12))
+            }
+            .foregroundStyle(.secondary)
     }
 }
