@@ -26,6 +26,9 @@ struct ShelfRow: View {
     let isPresent: Bool
     /// Nil until the first sweep lands, when a generic symbol stands in.
     let icon: NSImage?
+    /// The project this row was filed under, when it was filed under one.
+    /// Nil for everything filed into a watched folder.
+    let projectName: String?
     let onUndo: () -> Void
 
     @State private var isHovered = false
@@ -104,56 +107,65 @@ struct ShelfRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            fileIcon
-                .frame(width: 32, height: 32)
+        HStack(spacing: Theme.Space.iconGap) {
+            TypeBadge(fileExtension: record.to.pathExtension)
+                .opacity(isPresent ? 1 : 0.35)
+                .grayscale(isPresent ? 0 : 1)
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: Theme.Space.nameToMeta) {
                 Text(record.originalName)
-                    .font(.system(size: 13, weight: .medium))
+                    .rowName()
+                    .foregroundStyle(isPresent ? .primary : .secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    // A stale row's *name* is struck through, not its whole
-                    // body: the name is the part that no longer points at
-                    // anything, and striking the subtitle would cross out the
-                    // sentence explaining why.
-                    .strikethrough(!isPresent, color: .secondary)
-                Text(isPresent ? destinationTrail : String(localized: "Moved or deleted"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+
+                // Destination, subdivision and time are peers in one line that
+                // truncates from the tail, so time degrades first — it is the
+                // least load-bearing of the three. The rejected alternative gave
+                // time its own right-aligned slot, which put three claims on one
+                // edge and lost the argument to Turkish.
+                Text(metadata)
+                    .font(.system(size: 11))
+                    .foregroundStyle(isPresent ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
                     .lineLimit(1)
-                    .truncationMode(.head)
+                    .truncationMode(.tail)
             }
 
-            Spacer(minLength: 8)
-
-            Text(filedWhen)
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .monospacedDigit()
+            Spacer(minLength: 4)
 
             Button(action: onUndo) {
                 Image(systemName: "arrow.uturn.backward")
                     .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 24, height: 24)
+                    .background(
+                        Circle().fill(isHovered ? Theme.Colour.hoverStrong : Color.clear)
+                    )
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
+            // Secondary at rest, primary on hover. What hover changes is
+            // emphasis, never existence: this is a real focusable button with a
+            // focus ring, and someone driving the app from the keyboard must be
+            // able to reach it.
+            .foregroundStyle(isHovered ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            .opacity(isPresent ? 1 : 0.3)
             .help(String(localized: "Undo this move"))
             .disabled(!isPresent)
-            // Dimmed rather than hidden when the pointer is elsewhere. Fully
-            // hiding it would make undo undiscoverable — you cannot hover for
-            // a control you do not know is there — and would take it away from
-            // anyone driving the app without a pointer.
-            .opacity(isHovered ? 1 : 0.4)
         }
         .padding(.vertical, 6)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 7)
+        // The chip. A present row is an object you can pick up; a stale one
+        // loses its fill, its border and its shadow, because flat reads as
+        // inert and that is exactly what it is.
         .background {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(isHovered ? 0.08 : 0))
+            RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
+                .fill(isPresent ? Theme.Colour.chipFill : Color.clear)
         }
-        .padding(.horizontal, 6)
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
+                .stroke(isPresent ? Theme.Colour.chipBorder : Color.clear, lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(isPresent ? 0.06 : 0), radius: 1, y: 1)
         .contentShape(Rectangle())
-        .opacity(isPresent ? 1 : 0.5)
         .onHover { isHovered = $0 }
         .animation(.easeOut(duration: 0.12), value: isHovered)
         .onDrag {
@@ -171,18 +183,16 @@ struct ShelfRow: View {
         }
     }
 
-    @ViewBuilder
-    private var fileIcon: some View {
-        if let icon {
-            Image(nsImage: icon)
-                .resizable()
-                .scaledToFit()
-        } else {
-            Image(systemName: "doc")
-                .resizable()
-                .scaledToFit()
-                .padding(4)
-                .foregroundStyle(.secondary)
+    /// Destination, subdivision and time in one line — or, when the file is
+    /// gone, the status in the destination's place.
+    ///
+    /// `destinationTrail` already joins the folders below the watched root with
+    /// `·`, so appending time with the same separator keeps one grammar for the
+    /// whole line rather than two.
+    private var metadata: String {
+        guard isPresent else {
+            return "\(String(localized: "Moved or deleted")) · \(filedWhen)"
         }
+        return "\(projectName ?? destinationTrail) · \(filedWhen)"
     }
 }

@@ -193,7 +193,8 @@ struct ShelfView: View {
                             ShelfRow(
                                 record: record,
                                 isPresent: rowStatus[record.id]?.isPresent ?? true,
-                                icon: rowStatus[record.id]?.icon
+                                icon: rowStatus[record.id]?.icon,
+                                projectName: nil
                             ) {
                                 // `undo` is async, so the row's synchronous
                                 // button action hands it to a task.
