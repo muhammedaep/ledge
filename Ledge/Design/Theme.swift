@@ -138,4 +138,14 @@ extension View {
     func mono() -> some View {
         font(.system(size: 11, design: .monospaced))
     }
+
+    /// 13 semibold, primary. Window titles and the empty-state headline.
+    func titleText() -> some View {
+        font(.system(size: 13, weight: .semibold))
+    }
+
+    /// 12 regular, primary. Field text and the Organize sheet's list rows.
+    func fieldText() -> some View {
+        font(.system(size: 12))
+    }
 }

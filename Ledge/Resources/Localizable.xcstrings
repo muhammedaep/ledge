@@ -861,6 +861,16 @@
         }
       }
     },
+    "New downloads appear here — drag any row to use the file.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni indirilenler burada görünür — dosyayı kullanmak için satırı sürükleyin."
+          }
+        }
+      }
+    },
     "No Watched Folders": {
       "localizations": {
         "en": {
@@ -935,18 +945,12 @@
         }
       }
     },
-    "Nothing filed yet.": {
+    "Nothing filed yet": {
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nothing filed yet."
-          }
-        },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Henüz klasörlenen bir şey yok."
+            "value": "Henüz klasörlenen bir şey yok"
           }
         }
       }

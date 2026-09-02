@@ -9,9 +9,9 @@ import LedgeCore
 /// file stays reachable, so dragging the row hands the real file to whatever
 /// app is underneath.
 ///
-/// `isPresent` and `icon` are handed in by `ShelfView` rather than read here.
-/// Both are filesystem reads, done once per visible row, and the shelf has to
-/// open the instant the menu bar icon is clicked.
+/// `isPresent` is handed in by `ShelfView` rather than read here. It is a
+/// filesystem read, done once per visible row, and the shelf has to open the
+/// instant the menu bar icon is clicked.
 ///
 /// The stall this actually avoids is an unresponsive *network* mount, where a
 /// stat blocks until the mount times out. It is deliberately no longer claimed
@@ -24,8 +24,6 @@ struct ShelfRow: View {
     /// Whether the file was there as of the shelf's last sweep. Drives how the
     /// row *looks*; never the gate on what it *does* — see `isStillThere()`.
     let isPresent: Bool
-    /// Nil until the first sweep lands, when a generic symbol stands in.
-    let icon: NSImage?
     /// The project this row was filed under, when it was filed under one.
     /// Nil for everything filed into a watched folder.
     let projectName: String?

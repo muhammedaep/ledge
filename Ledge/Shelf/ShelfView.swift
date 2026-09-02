@@ -4,13 +4,8 @@ import SwiftUI
 import LedgeCore
 
 /// What a row needs from the filesystem, read in one sweep off the main actor.
-///
-/// `@unchecked Sendable` for the `NSImage`: it is built on the sweep's own
-/// thread, never mutated afterwards, and only read on the main actor once the
-/// sweep hands it over — so it is never touched from two places at once.
-private struct RowStatus: @unchecked Sendable {
+private struct RowStatus: Sendable {
     let isPresent: Bool
-    let icon: NSImage
 }
 
 /// The menu bar panel: where downloads are being filed, what was filed
@@ -19,7 +14,7 @@ struct ShelfView: View {
     @Environment(AppState.self) private var state
     @State private var showingOrganize = false
 
-    /// Liveness and icon per record id, refreshed whenever the shelf appears.
+    /// Liveness per record id, refreshed whenever the shelf appears.
     ///
     /// This has to be stored rather than computed in `body`. A `MoveRecord`
     /// outlives the file it describes, but "does that file still exist" has no
@@ -38,10 +33,10 @@ struct ShelfView: View {
     /// and race the same way. `rowStatus` is replaced wholesale, so an older
     /// sweep landing last publishes a dictionary built from a record list that
     /// no longer exists: a download filed while it was running has no entry, and
-    /// its row sits with a generic icon until some unrelated event refreshes the
-    /// shelf. Nothing *does* the wrong thing — `ShelfRow.isStillThere()` re-reads
-    /// at gesture time — but the shelf shows a stale answer, which is precisely
-    /// what this sweep exists to prevent.
+    /// its row sits with a stale liveness answer until some unrelated event
+    /// refreshes the shelf. Nothing *does* the wrong thing —
+    /// `ShelfRow.isStillThere()` re-reads at gesture time — but the shelf shows
+    /// a stale answer, which is precisely what this sweep exists to prevent.
     @State private var rowStatusGeneration = 0
 
     /// This view's own panel, so the refresh below can tell it from Settings
@@ -77,6 +72,11 @@ struct ShelfView: View {
             undoShortcut
         }
         .frame(width: 360)
+        // The boards specify a translucent fill and a 36pt blur, which is how
+        // the web imitates macOS vibrancy. A material is the real thing: it
+        // behaves correctly over any wallpaper and in both themes, which a
+        // fixed rgba cannot. Spec §8.2.
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
         .background(WindowReader { window in
             shelfWindow = window
             configure(window)
@@ -171,20 +171,25 @@ struct ShelfView: View {
 
             Text("RECENT DOWNLOADS")
                 .sectionLabel()
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
-
-            Divider()
+                .padding(.horizontal, Theme.Space.panel)
+                .padding(.top, Theme.Space.section)
+                .padding(.bottom, 5)
 
             if state.recentRecords.isEmpty {
-                Text("Nothing filed yet.")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 28)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Nothing filed yet")
+                        .titleText()
+                    // The only line in the app that explains the product.
+                    Text("New downloads appear here — drag any row to use the file.")
+                        .rowMeta()
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Theme.Space.panel)
+                .padding(.vertical, 22)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 0) {
+                    LazyVStack(spacing: Theme.Space.rowGap) {
                         ForEach(state.recentRecords) { record in
                             // Until the first sweep lands, a row shows as
                             // present: the display is briefly optimistic, while
@@ -193,8 +198,7 @@ struct ShelfView: View {
                             ShelfRow(
                                 record: record,
                                 isPresent: rowStatus[record.id]?.isPresent ?? true,
-                                icon: rowStatus[record.id]?.icon,
-                                projectName: nil
+                                projectName: projectName(for: record)
                             ) {
                                 // `undo` is async, so the row's synchronous
                                 // button action hands it to a task.
@@ -202,40 +206,59 @@ struct ShelfView: View {
                             }
                         }
                     }
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
                 }
                 .frame(maxHeight: 340)
             }
         }
     }
 
+    /// The project a record was filed under, or nil.
+    ///
+    /// Matched by containment rather than stored on the record, because
+    /// `MoveRecord` deliberately records where a file was *found* — that is
+    /// what undo needs — and a project changes only where it went.
+    private func projectName(for record: MoveRecord) -> String? {
+        state.projects.first { project in
+            record.to.path.hasPrefix(project.folder.path + "/")
+        }?.name
+    }
+
     /// Organize, Settings and Quit. Rendered outside `shelf` so that no state —
     /// including one where Ledge cannot read a thing — can take them away.
     private var footer: some View {
-        HStack {
+        HStack(spacing: 0) {
             Button("Organize Now…") { showingOrganize = true }
-                // Only when there is nowhere left to organize *from*. This used
-                // to ask the all-or-nothing `hasFolderAccess`, false the moment
-                // any single watched folder was blocked — so one locked folder
-                // disabled Organize Now for the readable one beside it, the same
-                // mistake the shelf itself was moved off and this control was
-                // left behind on. Which folder is being organized is the sheet's
-                // own question, and it is the sheet that answers it: it has the
-                // picker.
+                .buttonStyle(.plain)
+                .rowName()
+                .foregroundStyle(Theme.Colour.accent)
+                // Only when there is nowhere left to organize *from*.
                 .disabled(!state.hasUsableFolder)
+
             Spacer()
-            SettingsLink { Image(systemName: "gearshape") }
-                .buttonStyle(.borderless)
-                .help(String(localized: "Settings"))
+
+            SettingsLink {
+                Image(systemName: "gearshape")
+                    .frame(width: 28, height: Theme.Size.button)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help(String(localized: "Settings"))
+
             Button {
                 NSApplication.shared.terminate(nil)
             } label: {
                 Image(systemName: "power")
+                    .frame(width: 28, height: Theme.Size.button)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
             .help(String(localized: "Quit Ledge"))
         }
-        .padding(10)
+        .padding(.leading, Theme.Space.panel)
+        .padding(.trailing, 6)
+        .frame(height: Theme.Size.footer)
     }
 
     /// ⌘Z, which spec §7.5 promised and nothing ever built.
@@ -316,12 +339,11 @@ struct ShelfView: View {
         }
     }
 
-    /// Re-reads liveness and icon for every record currently on the shelf.
+    /// Re-reads liveness for every record currently on the shelf.
     ///
-    /// Off the main actor deliberately. Both the liveness check and
-    /// `icon(forFile:)` are filesystem reads, run once per record, and a menu
-    /// bar icon that does nothing when clicked is the worst failure this view
-    /// has.
+    /// Off the main actor deliberately. The liveness check is a filesystem
+    /// read, run once per record, and a menu bar icon that does nothing when
+    /// clicked is the worst failure this view has.
     ///
     /// The read that genuinely blocks is one against an unresponsive network
     /// mount, which stalls until the mount times out. Not a *local* volume being
@@ -341,8 +363,7 @@ struct ShelfView: View {
                     // both count a dangling symlink as a file that is there, so
                     // a row that dimmed itself and disabled its own undo button
                     // was describing a file the rest of the app can still move.
-                    isPresent: FileEntry.exists(atPath: record.to.path),
-                    icon: NSWorkspace.shared.icon(forFile: record.to.path)
+                    isPresent: FileEntry.exists(atPath: record.to.path)
                 )
             }
             return status
@@ -367,9 +388,10 @@ struct ShelfView: View {
     /// Without this, project mode is invisible: nothing else in the shelf says
     /// which folder the next download will land in.
     private var destinationHeader: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("FILING INTO")
                 .sectionLabel()
+
             Menu {
                 Button {
                     state.setActiveProject(nil)
@@ -388,14 +410,39 @@ struct ShelfView: View {
                 Divider()
                 Button("Choose Project…", action: chooseProject)
             } label: {
-                Text(state.activeProject?.name ?? defaultDestinationName)
-                    .font(.body.weight(.medium))
+                HStack(spacing: 7) {
+                    Text(state.activeProject?.name ?? defaultDestinationName)
+                        .rowName()
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 16, height: 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(Theme.Colour.accent)
+                        )
+                }
+                .padding(.leading, 9)
+                .padding(.trailing, 7)
+                .frame(height: Theme.Size.popup)
+                .background {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Theme.Colour.chipFill)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(Theme.Colour.chipBorder, lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.08), radius: 0.75, y: 0.5)
             }
             .menuStyle(.borderlessButton)
-            .fixedSize()
+            .menuIndicator(.hidden)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
+        .padding(.horizontal, Theme.Space.panel)
+        .padding(.top, Theme.Space.panel)
     }
 
     /// What to call the no-project destination.
