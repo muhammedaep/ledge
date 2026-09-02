@@ -125,7 +125,7 @@ struct ShelfRow: View {
                 // time its own right-aligned slot, which put three claims on one
                 // edge and lost the argument to Turkish.
                 Text(metadata)
-                    .font(.system(size: 11))
+                    .rowMeta()
                     .foregroundStyle(isPresent ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
                     .lineLimit(1)
                     .truncationMode(.tail)
