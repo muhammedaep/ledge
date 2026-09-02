@@ -31,8 +31,7 @@ struct ErrorBanner: View {
                     .foregroundStyle(Theme.Colour.amber)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(message)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.Colour.amber)
+                        .rowMeta(AnyShapeStyle(Theme.Colour.amber))
                         .fixedSize(horizontal: false, vertical: true)
                     if let action {
                         Button(action.title, action: action.run)

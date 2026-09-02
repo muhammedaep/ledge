@@ -40,7 +40,7 @@ struct PermissionView: View {
             // Decide which register a new one belongs to rather than copying
             // whichever line you happened to open.
             Text("Ledge can't see your \(folderName) folder")
-                .font(.system(size: 13, weight: .semibold))
+                .titleText()
 
             Text("Grant access under Privacy & Security → Files and Folders, then Ledge resumes automatically.")
                 .rowMeta()

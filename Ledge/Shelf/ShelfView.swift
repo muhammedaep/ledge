@@ -327,12 +327,10 @@ struct ShelfView: View {
                     Text(unavailable.count == 1
                          ? String(localized: "Ledge can't file from a watched folder right now.")
                          : String(localized: "Ledge can't file from \(unavailable.count) watched folders right now."))
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.Colour.amber)
+                        .rowMeta(AnyShapeStyle(Theme.Colour.amber))
                         .fixedSize(horizontal: false, vertical: true)
                     Text(unavailable.map(\.lastPathComponent).joined(separator: ", "))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .rowMeta()
                         .lineLimit(1)
                         .truncationMode(.head)
                     Button(String(localized: "Choose Folder Again…")) {
@@ -525,6 +523,7 @@ struct ShelfView: View {
 /// The banner needs a route out and `SettingsLink` cannot be used from a
 /// closure, so this is the AppKit equivalent of the footer's gear.
 enum SettingsLauncher {
+    @MainActor
     static func openWatchedFolders() {
         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
