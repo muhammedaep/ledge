@@ -439,21 +439,3 @@ struct ShelfView: View {
         state.setActiveProject(choice.project)
     }
 }
-
-extension View {
-    /// The small, quiet label naming a block of the shelf.
-    ///
-    /// The uppercasing lives in the string catalog rather than in
-    /// `.textCase(.uppercase)`, which uppercases with the non-localised
-    /// `String.uppercased()`. Measured on 2026-09-01: that turns Turkish
-    /// "Son İndirilenler" into "SON İNDIRILENLER" — a dotless I in a language
-    /// that distinguishes the two letters. `uppercased(with: Locale(identifier:
-    /// "tr"))` gets it right, but SwiftUI does not call that one, and a view
-    /// modifier is the wrong place to be choosing a locale anyway.
-    func sectionLabel() -> some View {
-        self
-            .font(.system(size: 10, weight: .semibold))
-            .tracking(0.5)
-            .foregroundStyle(.tertiary)
-    }
-}

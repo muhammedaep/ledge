@@ -22,6 +22,7 @@
 		A1B2C3D400114455AA66001B /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66001A /* InfoPlist.xcstrings */; };
 		A1B2C3D400114455AA66001D /* ErrorBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66001C /* ErrorBanner.swift */; };
 		A1B2C3D400114455AA66001F /* WindowReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66001E /* WindowReader.swift */; };
+		906E66B5C4674E7B3F07D17C /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49DA3A7BF2DC04291BDF8698 /* Theme.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		A1B2C3D400114455AA660015 /* RulesPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesPane.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA660017 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		A1B2C3D400114455AA66001A /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
+		49DA3A7BF2DC04291BDF8698 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +73,7 @@
 				A1B2C3D400114455AA66001C /* ErrorBanner.swift */,
 				A1B2C3D400114455AA66001E /* WindowReader.swift */,
 				19C7F09942DB4C26BB9C6052 /* Shelf */,
+				D8EF81F6EFD9B88723A77DA8 /* Design */,
 				A1B2C3D400114455AA66000E /* Organize */,
 				A1B2C3D400114455AA660014 /* Onboarding */,
 				A1B2C3D400114455AA66000F /* Settings */,
@@ -129,6 +132,14 @@
 				8D2901CE4CED4DEAB33BB283 /* Ledge.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D8EF81F6EFD9B88723A77DA8 /* Design */ = {
+			isa = PBXGroup;
+			children = (
+				49DA3A7BF2DC04291BDF8698 /* Theme.swift */,
+			);
+			path = Design;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -220,6 +231,7 @@
 				A1B2C3D400114455AA660011 /* GeneralPane.swift in Sources */,
 				A1B2C3D400114455AA660013 /* PermissionView.swift in Sources */,
 				A1B2C3D400114455AA660016 /* RulesPane.swift in Sources */,
+				906E66B5C4674E7B3F07D17C /* Theme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
