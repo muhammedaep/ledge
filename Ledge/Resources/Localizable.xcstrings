@@ -17,16 +17,6 @@
         }
       }
     },
-    "%@ · whole folder": {
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ · klasörün tamamı"
-          }
-        }
-      }
-    },
     "%lld": {
       "localizations": {
         "en": {
@@ -1453,6 +1443,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "şimdi"
+          }
+        }
+      }
+    },
+    "whole folder": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "klasörün tamamı"
           }
         }
       }

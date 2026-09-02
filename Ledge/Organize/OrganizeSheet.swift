@@ -188,9 +188,12 @@ struct OrganizeSheet: View {
     ///
     /// A folder is named as a whole rather than given a destination trail,
     /// because Ledge never looks inside one and a trail would imply it had.
+    /// Says only "whole folder", not the category — the row already sits
+    /// inside that category's section, so repeating its name here would
+    /// just echo the `Toggle` header above it.
     private func destinationLabel(for item: PlannedMove) -> String {
         item.isFolder
-            ? String(localized: "\(item.destination.category) · whole folder")
+            ? String(localized: "whole folder")
             : item.destination.folder.lastPathComponent
     }
 
