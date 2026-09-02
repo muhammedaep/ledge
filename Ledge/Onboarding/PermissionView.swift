@@ -39,12 +39,11 @@ struct PermissionView: View {
             // Organize picker, Settings — uses `lastPathComponent` or the path.
             // Decide which register a new one belongs to rather than copying
             // whichever line you happened to open.
-            Label("Ledge can't read your \(folderName) folder", systemImage: "lock.fill")
-                .font(.headline)
+            Text("Ledge can't see your \(folderName) folder")
+                .font(.system(size: 13, weight: .semibold))
 
-            Text("macOS needs your permission before Ledge can file downloads. Grant access to that folder, then reopen this menu.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Text("Grant access under Privacy & Security → Files and Folders, then Ledge resumes automatically.")
+                .rowMeta()
                 .fixedSize(horizontal: false, vertical: true)
 
             // Only worth listing when the headline can't name them all.
@@ -60,9 +59,12 @@ struct PermissionView: View {
                 .foregroundStyle(.secondary)
             }
 
-            Button("Open Privacy Settings", action: openPrivacySettings)
+            Button("Open System Settings…", action: openPrivacySettings)
+                .buttonStyle(.plain)
+                .rowName()
+                .foregroundStyle(Theme.Colour.accent)
         }
-        .padding(16)
+        .padding(Theme.Space.panel)
         // The width comes from the shelf, which wraps this in the panel that
         // also carries Settings and Quit — this view is the *list* being
         // replaced, not the whole window.

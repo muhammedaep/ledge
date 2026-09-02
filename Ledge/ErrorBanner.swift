@@ -15,35 +15,46 @@ struct ErrorBanner: View {
     let message: String?
     let horizontalPadding: CGFloat
     let topPadding: CGFloat
-    /// Non-nil only when the failure named permission, so the button appears
-    /// exactly where it is a route out. See `AppState.isPermissionDenied`.
+    /// Non-nil only when there is a route out of this failure — see
+    /// `AppState.isPermissionDenied` for the one that offers Privacy Settings.
     ///
     /// Declared before `onDismiss` on purpose: the trailing closure at every
     /// call site binds to the last parameter, and this one is not a literal.
-    var onOpenPrivacySettings: (() -> Void)?
+    var action: (title: String, run: () -> Void)?
     let onDismiss: () -> Void
 
     var body: some View {
         if let message {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Colour.amber)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(message)
-                        .font(.caption)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Colour.amber)
                         .fixedSize(horizontal: false, vertical: true)
-                    if let onOpenPrivacySettings {
-                        Button("Open Privacy Settings", action: onOpenPrivacySettings)
-                            .buttonStyle(.link)
-                            .font(.caption)
+                    if let action {
+                        Button(action.title, action: action.run)
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Theme.Colour.amber)
+                            .underline()
                     }
                 }
                 Spacer(minLength: 4)
                 Button(action: onDismiss) {
-                    Image(systemName: "xmark")
+                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
+                .foregroundStyle(Theme.Colour.amber.opacity(0.7))
                 .help(String(localized: "Dismiss"))
+            }
+            .padding(.vertical, 7)
+            .padding(.horizontal, 9)
+            .background {
+                RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
+                    .fill(Theme.Colour.amberFill)
             }
             .padding(.horizontal, horizontalPadding)
             .padding(.top, topPadding)

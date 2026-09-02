@@ -129,6 +129,16 @@
         }
       }
     },
+    "All new downloads go here until you end the project.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Projeyi bitirene kadar yeni indirilenler buraya gider."
+          }
+        }
+      }
+    },
     "Another rule is also called “%@”. They share one folder, each still applying its own subfolder setting inside it.": {
       "localizations": {
         "en": {
@@ -215,6 +225,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kategoriler yukarıdan aşağıya denenir. Bir dosyayı ilk sahiplenen kural kazanır."
+          }
+        }
+      }
+    },
+    "Choose Folder Again…": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klasörü Yeniden Seç…"
           }
         }
       }
@@ -427,6 +447,26 @@
         }
       }
     },
+    "End": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitir"
+          }
+        }
+      }
+    },
+    "End project %@": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ projesini bitir"
+          }
+        }
+      }
+    },
     "Every category you have added or changed is discarded. Nothing is written until you save.": {
       "localizations": {
         "en": {
@@ -571,6 +611,16 @@
         }
       }
     },
+    "Grant access under Privacy & Security → Files and Folders, then Ledge resumes automatically.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gizlilik ve Güvenlik → Dosyalar ve Klasörler altından erişim verin, Ledge kendiliğinden devam eder."
+          }
+        }
+      }
+    },
     "It is no longer where Ledge found it.": {
       "comment": "Why a move failed: the file was gone before Ledge could move it.",
       "extractionState": "manual",
@@ -647,18 +697,12 @@
         }
       }
     },
-    "Ledge can't read your %@ folder": {
+    "Ledge can't see your %@ folder": {
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ledge can't read your %@ folder"
-          }
-        },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ledge, %@ klasörünü okuyamıyor"
+            "value": "Ledge, %@ klasörünü göremiyor"
           }
         }
       }
@@ -1003,6 +1047,16 @@
         }
       }
     },
+    "Open System Settings…": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sistem Ayarlarını Aç…"
+          }
+        }
+      }
+    },
     "Organize Now": {
       "localizations": {
         "en": {
@@ -1046,22 +1100,6 @@
         }
       },
       "shouldTranslate": false
-    },
-    "Permission…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Permission…"
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "İzin…"
-          }
-        }
-      }
     },
     "Project folder is missing — filing into %@ instead.": {
       "localizations": {
@@ -1235,22 +1273,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ayarlar"
-          }
-        }
-      }
-    },
-    "Settings…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Settings…"
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ayarlar…"
           }
         }
       }
@@ -1459,22 +1481,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kurallar dosyanız okunamadı, Ledge varsayılanlara döndü. Eski dosya silinmedi, adı değiştirildi."
-          }
-        }
-      }
-    },
-    "macOS needs your permission before Ledge can file downloads. Grant access to that folder, then reopen this menu.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "macOS needs your permission before Ledge can file downloads. Grant access to that folder, then reopen this menu."
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ledge'in indirilenleri klasörleyebilmesi için macOS'un izni gerekiyor. O klasöre erişim verip bu menüyü yeniden açın."
           }
         }
       }

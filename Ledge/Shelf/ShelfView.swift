@@ -308,33 +308,51 @@ struct ShelfView: View {
         let blocked = showsPermissionScreen ? [] : state.unreadableFolders
         let unavailable = state.missingFolders + blocked
         if !unavailable.isEmpty {
+            // The same amber pill as `errorBanner`, not the `ErrorBanner` type
+            // itself: that struct's `message` is a single string, and this
+            // banner has two registers to keep apart — the sentence, and the
+            // folder names, which stay `.secondary` rather than sharing the
+            // warning colour. One action replaces the old pair (a Privacy
+            // Settings shortcut for a blocked folder, a plain Settings link for
+            // everything else): re-picking a folder from the watched-folder
+            // list fixes both a folder that is merely gone and one that is
+            // blocked, so one destination now covers what needed two routes.
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: blocked.isEmpty
                       ? "externaldrive.trianglebadge.exclamationmark"
                       : "lock.fill")
-                    .foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 2) {
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Colour.amber)
+                VStack(alignment: .leading, spacing: 4) {
                     Text(unavailable.count == 1
                          ? String(localized: "Ledge can't file from a watched folder right now.")
                          : String(localized: "Ledge can't file from \(unavailable.count) watched folders right now."))
-                        .font(.caption)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Colour.amber)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(unavailable.map(\.lastPathComponent).joined(separator: ", "))
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.head)
+                    Button(String(localized: "Choose Folder Again…")) {
+                        NSApplication.shared.activate(ignoringOtherApps: true)
+                        SettingsLauncher.openWatchedFolders()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.Colour.amber)
+                    .underline()
                 }
                 Spacer(minLength: 4)
-                // A blocked folder has somewhere to go that Settings isn't.
-                if !blocked.isEmpty {
-                    Button("Permission…") { PrivacySettings.open() }
-                        .buttonStyle(.borderless)
-                        .font(.caption)
-                }
-                SettingsLink { Text("Settings…").font(.caption) }
-                    .buttonStyle(.borderless)
             }
-            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .padding(.horizontal, 9)
+            .background {
+                RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
+                    .fill(Theme.Colour.amberFill)
+            }
+            .padding(.horizontal, Theme.Space.panel)
             .padding(.top, 8)
         }
     }
@@ -378,8 +396,9 @@ struct ShelfView: View {
     /// undo that reports nothing is worse than one that never happened.
     private var errorBanner: some View {
         ErrorBanner(message: state.lastError, horizontalPadding: 12, topPadding: 8,
-                    onOpenPrivacySettings: state.lastErrorOffersPrivacySettings
-                        ? { PrivacySettings.open() } : nil) {
+                    action: state.lastErrorOffersPrivacySettings
+                        ? (String(localized: "Open Privacy Settings"), { PrivacySettings.open() })
+                        : nil) {
             state.clearError()
         }
     }
@@ -440,9 +459,22 @@ struct ShelfView: View {
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
+
+            if let project = state.activeProject {
+                Text("All new downloads go here until you end the project.")
+                    .rowMeta()
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("End") { state.setActiveProject(nil) }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.Colour.accent)
+                    .accessibilityLabel(Text("End project \(project.name)"))
+            }
         }
         .padding(.horizontal, Theme.Space.panel)
         .padding(.top, Theme.Space.panel)
+        .padding(.bottom, state.activeProject == nil ? 0 : 10)
+        .background(state.activeProject == nil ? Color.clear : Theme.Colour.accent.opacity(0.08))
     }
 
     /// What to call the no-project destination.
@@ -485,5 +517,15 @@ struct ShelfView: View {
         // destination with no explanation.
         guard choice.wasAlreadyKnown || state.updateProjects(choice.projects) else { return }
         state.setActiveProject(choice.project)
+    }
+}
+
+/// Opens Settings on the pane holding the watched-folder list.
+///
+/// The banner needs a route out and `SettingsLink` cannot be used from a
+/// closure, so this is the AppKit equivalent of the footer's gear.
+enum SettingsLauncher {
+    static func openWatchedFolders() {
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 }

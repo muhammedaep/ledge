@@ -22,8 +22,9 @@ struct SettingsView: View {
             // detail that pane's comment complains was being sent somewhere the
             // user is not looking.
             ErrorBanner(message: state.lastError, horizontalPadding: 14, topPadding: 10,
-                    onOpenPrivacySettings: state.lastErrorOffersPrivacySettings
-                        ? { PrivacySettings.open() } : nil) {
+                    action: state.lastErrorOffersPrivacySettings
+                        ? (String(localized: "Open Privacy Settings"), { PrivacySettings.open() })
+                        : nil) {
                 state.clearError()
             }
 

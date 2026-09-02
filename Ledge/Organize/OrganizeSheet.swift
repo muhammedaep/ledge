@@ -216,8 +216,9 @@ struct OrganizeSheet: View {
     /// cannot afford.
     private var errorBanner: some View {
         ErrorBanner(message: state.lastError, horizontalPadding: 14, topPadding: 10,
-                    onOpenPrivacySettings: state.lastErrorOffersPrivacySettings
-                        ? { PrivacySettings.open() } : nil) {
+                    action: state.lastErrorOffersPrivacySettings
+                        ? (String(localized: "Open Privacy Settings"), { PrivacySettings.open() })
+                        : nil) {
             state.clearError()
         }
     }
