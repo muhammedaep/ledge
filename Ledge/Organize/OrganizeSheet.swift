@@ -33,6 +33,7 @@ struct OrganizeSheet: View {
 
     @State private var folder: URL?
     @State private var preview = OrganizePreview(plan: [])
+    @State private var excluded: Set<String> = []
     @State private var isScanning = false
 
     /// This sheet's own window, so the refresh below can tell its panel becoming
@@ -108,6 +109,11 @@ struct OrganizeSheet: View {
                     get: { target },
                     set: { newFolder in
                         folder = newFolder
+                        // Exclusions name categories in *this* folder's plan.
+                        // Carried across, one for a category the new folder has
+                        // no row for would be an invisible rule with nothing on
+                        // screen to explain it.
+                        excluded = []
                         rescanToken += 1
                     }
                 )) {
@@ -142,16 +148,36 @@ struct OrganizeSheet: View {
                     ? "Looking through this folder…"
                     : "Nothing left to organize in this folder.")
         } else {
-            List(preview.plan) { item in
-                HStack(spacing: 8) {
-                    Text(item.source.lastPathComponent)
-                        .fieldText()
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer(minLength: 12)
-                    Text(destinationLabel(for: item))
-                        .rowMeta()
-                        .lineLimit(1)
+            List {
+                ForEach(preview.groups) { group in
+                    Section {
+                        // `preview.plan` is already ordered by filename;
+                        // filtering it keeps that order rather than
+                        // re-deriving it per section.
+                        ForEach(preview.plan.filter { $0.destination.category == group.category }) { item in
+                            HStack(spacing: 8) {
+                                Text(item.source.lastPathComponent)
+                                    .fieldText()
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Spacer(minLength: 12)
+                                Text(destinationLabel(for: item))
+                                    .rowMeta()
+                                    .lineLimit(1)
+                            }
+                        }
+                    } header: {
+                        Toggle(isOn: binding(for: group.category)) {
+                            HStack {
+                                Text(group.category)
+                                Spacer()
+                                Text("\(group.count)")
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
+                        }
+                        .disabled(isMoving)
+                    }
                 }
             }
             .frame(height: 260)
@@ -195,7 +221,7 @@ struct OrganizeSheet: View {
             // when the sheet is reopened.
             Button(isMoving ? "Close" : "Cancel") { dismiss() }
                 .keyboardShortcut(.cancelAction)
-            Button("Move \(movableCount) Items", action: startMove)
+            Button(action: startMove) { Text(moveButtonTitle) }
                 .keyboardShortcut(.defaultAction)
                 .disabled(movableCount == 0 || isMoving)
         }
@@ -237,13 +263,30 @@ struct OrganizeSheet: View {
             .padding(.vertical, 40)
     }
 
-    /// Every planned move the button promises — including the ones landing in
-    /// the fallback category. The boards count unclaimed files out of the
-    /// button because they leave them in place; Ledge moves them, so it
-    /// counts them here (spec §8.1).
-    private var movableCount: Int { preview.plan.count }
+    /// Every planned move the button promises, with the categories still
+    /// switched on — including the fallback. The boards count unclaimed
+    /// files out of the button because they leave them in place; Ledge
+    /// moves them, so a fallback left on counts them too (spec §8.1).
+    private var movableCount: Int { preview.selectedCount(excluding: excluded) }
+
+    private var moveButtonTitle: LocalizedStringKey {
+        isMoving ? "Moving…" : "Move \(movableCount) Items"
+    }
 
     // MARK: - Actions
+
+    private func binding(for category: String) -> Binding<Bool> {
+        Binding(
+            get: { !excluded.contains(category) },
+            set: { isOn in
+                if isOn {
+                    excluded.remove(category)
+                } else {
+                    excluded.insert(category)
+                }
+            }
+        )
+    }
 
     /// `moves` is captured before the batch starts, so what runs is the list the
     /// user was looking at when they agreed to it — not whatever a rescan
@@ -253,7 +296,7 @@ struct OrganizeSheet: View {
     /// finishes correctly even if the sheet is dismissed while it runs.
     private func startMove() {
         guard let root = targetFolder else { return }
-        let moves = preview.plan
+        let moves = preview.selectedMoves(excluding: excluded)
         Task {
             await state.apply(moves, root: root)
             rescanToken += 1

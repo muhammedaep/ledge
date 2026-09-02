@@ -753,6 +753,22 @@
         }
       }
     },
+    "Moving…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moving…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taşınıyor…"
+          }
+        }
+      }
+    },
     "Move up — earlier rules win ties": {
       "localizations": {
         "en": {
