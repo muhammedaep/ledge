@@ -120,9 +120,18 @@ extension View {
         font(.system(size: 13))
     }
 
-    /// 11 regular, secondary. The metadata line, captions, diagnostics.
-    func rowMeta() -> some View {
-        font(.system(size: 11)).foregroundStyle(.secondary)
+    /// 11 regular. The metadata line, captions, diagnostics.
+    ///
+    /// The style is a parameter rather than a fixed `.secondary` because a
+    /// caller sometimes needs a different one — a stale shelf row's metadata
+    /// falls to `.tertiary` — and chaining `.foregroundStyle` onto this helper
+    /// does **not** override what it sets. Measured on 2026-09-02 by rendering
+    /// both and diffing the bitmaps: a style applied directly to a leaf view
+    /// beats one applied to it from further out in the same chain, whichever
+    /// comes later in the source. The same trap is waiting in `sectionLabel()`
+    /// and `fieldLabel()`, which set `.tertiary` the same way.
+    func rowMeta(_ style: AnyShapeStyle = AnyShapeStyle(.secondary)) -> some View {
+        font(.system(size: 11)).foregroundStyle(style)
     }
 
     /// 11 SF Mono, primary. Extensions, name patterns, globs.
