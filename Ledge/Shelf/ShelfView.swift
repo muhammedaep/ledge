@@ -12,6 +12,9 @@ private struct RowStatus: Sendable {
 /// recently, and the handful of actions that operate on the whole app.
 struct ShelfView: View {
     @Environment(AppState.self) private var state
+    /// Opens the Settings scene from a closure, for the unavailable-folder
+    /// banner's action — `SettingsLink` is a view and cannot be called from one.
+    @Environment(\.openSettings) private var openSettings
     @State private var showingOrganize = false
 
     /// Liveness per record id, refreshed whenever the shelf appears.
@@ -334,8 +337,15 @@ struct ShelfView: View {
                         .lineLimit(1)
                         .truncationMode(.head)
                     Button(String(localized: "Choose Folder Again…")) {
+                        // `openSettings()` alone was not verified to raise the
+                        // window over whatever the user is in front of — Ledge
+                        // is an accessory app (LSUIElement) and never frontmost
+                        // while the shelf is open, the same reason
+                        // `chooseProject()` below activates before its own
+                        // panel. Keeping the pairing rather than assuming the
+                        // environment action already covers it.
                         NSApplication.shared.activate(ignoringOtherApps: true)
-                        SettingsLauncher.openWatchedFolders()
+                        openSettings()
                     }
                     .buttonStyle(.plain)
                     .font(.system(size: 11, weight: .medium))
@@ -515,16 +525,5 @@ struct ShelfView: View {
         // destination with no explanation.
         guard choice.wasAlreadyKnown || state.updateProjects(choice.projects) else { return }
         state.setActiveProject(choice.project)
-    }
-}
-
-/// Opens Settings on the pane holding the watched-folder list.
-///
-/// The banner needs a route out and `SettingsLink` cannot be used from a
-/// closure, so this is the AppKit equivalent of the footer's gear.
-enum SettingsLauncher {
-    @MainActor
-    static func openWatchedFolders() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 }
