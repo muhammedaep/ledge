@@ -172,6 +172,18 @@ extension View {
         font(.system(size: 11, design: .monospaced))
     }
 
+    /// 11 medium. The small action inside a banner or a header — `Choose
+    /// Folder Again…`, `Open Privacy Settings`, `End`. One number, three
+    /// files, before this: exactly the shape that belongs here rather than
+    /// staying inline at each call site. Never sets a colour — every call
+    /// site still picks its own (amber for a warning, accent for an
+    /// in-context action) — so chaining `.foregroundStyle` after this one
+    /// works normally; it isn't in the `rowMeta()`/`sectionLabel()`/
+    /// `fieldLabel()` family that traps that chain.
+    func actionLink() -> some View {
+        font(.system(size: 11, weight: .medium))
+    }
+
     /// 13 semibold, primary. Window titles and the empty-state headline.
     func titleText() -> some View {
         font(.system(size: 13, weight: .semibold))

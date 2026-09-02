@@ -36,7 +36,7 @@ struct ErrorBanner: View {
                     if let action {
                         Button(action.title, action: action.run)
                             .buttonStyle(.plain)
-                            .font(.system(size: 11, weight: .medium))
+                            .actionLink()
                             .foregroundStyle(Theme.Colour.amber)
                             .underline()
                     }

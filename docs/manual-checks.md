@@ -28,7 +28,7 @@ hides items rather than creating slots.
 
 macOS will ask for permission to read `~/Downloads` the first time. Allow it — if
 you decline, you should get an explanatory screen rather than an app that silently
-does nothing, and that is itself check 9.
+does nothing, and that is itself check 10.
 
 ---
 
@@ -95,7 +95,18 @@ Batch** and confirm everything returns.
 
 Remove the watched folder and `rm -rf ~/Downloads/scratch` afterwards.
 
-## 6. Ejecting a drive does not lock you out
+## 6. Organize Now's count is what actually moves
+
+Open **Organize Now…** on a folder holding more than one category. The
+caption above the list and the **Move N Items** button below it should show
+the same number.
+
+Uncheck one category's toggle. Both numbers should drop together and still
+agree with each other — not one counting the whole plan while the other
+counts only what is selected. Click **Move** and confirm that many items
+moved.
+
+## 7. Ejecting a drive does not lock you out
 
 If you watch a folder on an external drive: eject it while Ledge is running.
 
@@ -106,7 +117,7 @@ Monitor was the only way out.
 With one folder blocked and another readable, the working folder's shelf should
 still be visible and still filing. A blocked folder gets a banner, not a takeover.
 
-## 7. Launch at login
+## 8. Launch at login
 
 Toggle it in Settings, then check:
 
@@ -116,7 +127,7 @@ sfltool dumpbtm | grep -i ledge
 
 Toggle it back off if you do not want it.
 
-## 8. Turkish layout — only if you run Ledge in Turkish
+## 9. Turkish layout — only if you run Ledge in Turkish
 
 The interface is localised, but **it will not appear in Turkish unless your system
 language is Turkish**, or you assign Turkish to Ledge specifically in System
@@ -142,7 +153,7 @@ If you do, the places most likely to break are, in order:
    either way, but this is a call for a native reader, not a grammar rule, and
    nobody who reads Turkish has looked at it yet.
 
-## 9. A denied permission explains itself
+## 10. A denied permission explains itself
 
 Deny Ledge access to `~/Downloads` in System Settings → Privacy & Security → Files
 and Folders, then reopen the shelf.
@@ -150,14 +161,24 @@ and Folders, then reopen the shelf.
 You should get a screen that says what is wrong and offers a route to fix it —
 along with Settings and Quit, which must never disappear.
 
-## 10. Screenshots get their own folder
+## 11. A collapsed rule's Subfolders control is reachable
+
+Settings → Rules. Pick a rule you have not touched — Videos, say. Change its
+Subfolders to By month, save, reopen. If you cannot get at the control, that
+is the defect.
+
+This is the check that would have caught a clean rule card, once collapsed,
+never being reopenable again — nine of the ten default rules ship exactly
+that way, with no other route to their Subfolders picker.
+
+## 12. Screenshots get their own folder
 
 Take a screenshot into a watched folder. It should land in `Screenshots/`, not
 `Images/`. Open Settings → Rules: the Screenshots rule is there, above Images,
 with its patterns visible and editable. Delete it, quit, relaunch — it must
 stay deleted.
 
-## 11. The visual pass
+## 13. The visual pass
 
 Look at the shelf in light and in dark, then again with Ledge set to Turkish
 (System Settings → General → Language & Region → the per-app list). In each of
@@ -175,7 +196,26 @@ the four combinations:
   Turkish diagnostic. The card grows, the list scrolls, nothing is clipped.
 - The type badge on a screenshot is the image colour, not the Screenshots
   category's — a PNG looks like an image wherever it lands.
-- Put a watched folder into the state check 6 describes, then click the warning
+- File a `.zip` and a file with no extension into a watched folder. Both
+  should get the neutral badge treatment — chip fill, chip border, secondary
+  label — and the extensionless file's badge should carry no letters at all.
+  The boards never drew this case; nobody has looked at it yet.
+- Look closely at a Documents, Images or Videos badge in dark mode. The
+  boards only give light-mode values for the coloured badge families; the
+  dark page and border (14% and 28% opacity over the dark label colour) are
+  this branch's own invention and no board confirms them.
+- With an empty shelf, or a fresh watched folder with nothing filed yet, read
+  the empty state: `Nothing filed yet`, and beneath it
+  `New downloads appear here — drag any row to use the file.` — the only
+  line in the app that explains the product.
+- Open the destination chip's menu at the top of the shelf. It should list
+  every watched-folder default, every project with a checkmark on the active
+  one, and `Choose Project…` at the bottom. The chip itself: a folder name, a
+  `▸`, and a 16×16 accent-blue disclosure square carrying a white chevron.
+- With a project active, the whole header block should carry a faint accent
+  tint behind it — not just the label text reading `PROJECT MODE` instead of
+  `FILING INTO`.
+- Put a watched folder into the state check 7 describes, then click the warning
   banner's **Choose Folder Again…** button and confirm Settings comes to the
   front over whatever app you were in. Nobody has clicked this button yet. The
   code pairs `NSApplication.shared.activate(ignoringOtherApps: true)` with
@@ -188,7 +228,7 @@ None of this replaces the checks above. An interface that looks better and
 breaks the drag-out, undo, the stale row, project routing, the
 folder-as-one-unit rule or the eject lockout is a loss, not a trade.
 
-## 12. What could not be established here at all
+## 14. What could not be established here at all
 
 Colour is deliberately missing from the list below. Three of the tasks that
 built this interface measured it off-screen with `ImageRenderer` — rendering

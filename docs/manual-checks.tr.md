@@ -33,7 +33,7 @@ gizler, slot yaratmaz.
 
 macOS ilk açılışta `~/Downloads` klasörünü okuma izni ister. **İzin ver** — reddedersen
 sessizce hiçbir şey yapmayan bir uygulama yerine durumu açıklayan bir ekran
-görmelisin, ki o da 9. kontrol.
+görmelisin, ki o da 10. kontrol.
 
 ---
 
@@ -103,7 +103,18 @@ içinde olduğunu doğrula. Ardından **Undo Last Batch** (Son Grubu Geri Al) il
 
 Bitince izlenen klasörü kaldır ve `rm -rf ~/Downloads/scratch` çalıştır.
 
-## 6. Bir diski çıkarmak seni kilitlemiyor
+## 6. Şimdi Düzenle'nin sayısı gerçekten taşınanla aynı
+
+Birden çok kategori barındıran bir klasörde **Organize Now…** (Şimdi
+Düzenle…) aç. Listenin üstündeki açıklama ile alttaki **Move N Items**
+(N Öğeyi Taşı) butonu aynı sayıyı göstermeli.
+
+Bir kategorinin işaretini kaldır. İki sayı da birlikte düşmeli ve
+birbiriyle uyuşmaya devam etmeli — biri tüm planı sayarken diğeri
+yalnızca seçili olanı saymamalı. **Move** (Taşı) butonuna tıkla ve o
+kadar öğenin taşındığını doğrula.
+
+## 7. Bir diski çıkarmak seni kilitlemiyor
 
 Harici bir diskteki klasörü izliyorsan: Ledge çalışırken diski çıkar.
 
@@ -115,7 +126,7 @@ Bir klasör engelliyken diğeri okunabiliyorsa, çalışan klasörün rafı hâl
 olmalı ve klasörlemeye devam etmeli. Engellenen klasör bir bildirim şeridi alır,
 ekranı ele geçirmez.
 
-## 7. Girişte başlatma
+## 8. Girişte başlatma
 
 Ayarlardan aç, sonra kontrol et:
 
@@ -125,7 +136,7 @@ sfltool dumpbtm | grep -i ledge
 
 İstemiyorsan tekrar kapat.
 
-## 8. Türkçe yerleşim — yalnızca Ledge'i Türkçe çalıştırıyorsan
+## 9. Türkçe yerleşim — yalnızca Ledge'i Türkçe çalıştırıyorsan
 
 Arayüz yerelleştirildi, ama **sistem dilin Türkçe olmadıkça Türkçe görünmez**;
 alternatif olarak System Settings → General → Language & Region → en alttaki
@@ -154,7 +165,7 @@ Atarsan, kırılmaya en yatkın yerler sırasıyla şunlar:
    dilbilgisi kuralından çok anadili sezgisi meselesi ve Türkçe okuyan henüz
    kimse bakmadı.
 
-## 9. Reddedilen izin kendini açıklıyor
+## 10. Reddedilen izin kendini açıklıyor
 
 System Settings → Privacy & Security → Files and Folders altından Ledge'in
 `~/Downloads` erişimini kaldır, sonra rafı tekrar aç.
@@ -162,14 +173,25 @@ System Settings → Privacy & Security → Files and Folders altından Ledge'in
 Neyin yanlış olduğunu söyleyen ve düzeltme yolu sunan bir ekran görmelisin — yanında
 **Settings** (Ayarlar) ve **Quit** (Çık) ile birlikte, ki bunlar asla kaybolmamalı.
 
-## 10. Ekran görüntüleri kendi klasörüne düşüyor
+## 11. Daraltılmış bir kuralın Alt klasörler kontrolüne erişilebiliyor
+
+Settings → Rules (Ayarlar → Kurallar). Hiç dokunmadığın bir kural seç —
+mesela Videos. Alt klasörler ayarını By month (Aya göre) yap, kaydet,
+tekrar aç. Kontrole erişemiyorsan, kusur budur.
+
+Bu, temiz bir kural kartının bir kez daraldıktan sonra bir daha asla
+açılamadığı hatayı yakalayacak kontrol — varsayılan on kuraldan dokuzu,
+Alt klasörler seçicisine başka hiçbir yol olmadan, tam olarak bu haldeyken
+geliyor.
+
+## 12. Ekran görüntüleri kendi klasörüne düşüyor
 
 İzlenen bir klasöre ekran görüntüsü al. `Screenshots/` içine düşmeli,
 `Images/` içine değil. Ayarlar → Kurallar'ı aç: Screenshots kuralı orada,
 Images'ın üstünde, desenleri görünür ve düzenlenebilir halde. Sil, çık,
 yeniden başlat — silinmiş kalmalı.
 
-## 11. Görsel geçiş
+## 13. Görsel geçiş
 
 Rafa açık temada, koyu temada, bir de Ledge'i Türkçe'ye alıp tekrar bak (System
 Settings → General → Language & Region → en alttaki uygulama listesi). Dört
@@ -189,7 +211,28 @@ kombinasyonun her birinde:
 - Bir ekran görüntüsündeki tür rozeti, Screenshots kategorisinin değil,
   görüntünün kendi rengi olmalı — bir PNG nereye düşerse düşsün bir görüntü
   gibi görünmeli.
-- 6. kontrolün anlattığı duruma bir klasörü sok, sonra uyarı şeridindeki
+- İzlenen bir klasöre bir `.zip` ve uzantısız bir dosya bırak. İkisi de nötr
+  rozet muamelesi almalı — chip dolgusu, chip kenarlığı, ikincil renkte
+  etiket — ve uzantısız dosyanın rozetinde hiç harf olmamalı. Bu durumu
+  tasarım panoları hiç çizmedi; şimdiye kadar kimse bakmadı.
+- Koyu temada bir Documents, Images ya da Videos rozetine yakından bak.
+  Panolar yalnızca açık temadaki renkli rozet ailelerinin değerlerini verdi;
+  koyu temadaki sayfa ve kenarlık (koyu etiket renginin üzerinde %14 ve %28
+  opaklık) bu dalın kendi icadı ve hiçbir pano bunları doğrulamıyor.
+- Boş bir rafla, ya da henüz hiçbir şey klasörlenmemiş yeni bir izlenen
+  klasörle, boş durumu oku: `Nothing filed yet` (Henüz klasörlenen bir şey
+  yok) ve altında `New downloads appear here — drag any row to use the
+  file.` (Yeni indirilenler burada görünür — dosyayı kullanmak için satırı
+  sürükleyin.) — uygulamanın ürünü açıkladığı tek satır.
+- Rafın üstündeki hedef chip'inin menüsünü aç. Her izlenen klasörün
+  varsayılanını, her projeyi (aktif olanın yanında bir onay işaretiyle) ve
+  en altta `Choose Project…` (Proje Seç…) seçeneğini listelemeli. Chip'in
+  kendisi: bir klasör adı, bir `▸`, ve beyaz bir şevronla 16×16'lık vurgu
+  mavisi bir açılır kare.
+- Bir proje aktifken, başlık bloğunun tamamı arkasında hafif bir vurgu tonu
+  taşımalı — yalnızca etiketin `FILING INTO` yerine `PROJECT MODE`
+  okunmasıyla kalmamalı.
+- 7. kontrolün anlattığı duruma bir klasörü sok, sonra uyarı şeridindeki
   **Choose Folder Again…** (Klasörü Yeniden Seç…) butonuna tıkla ve Ayarlar
   penceresinin, o an neyle uğraşıyor olursan ol, öne geldiğini doğrula. Bu
   butona şimdiye kadar kimse tıklamadı. Kod, `openSettings()`'in tek başına,
@@ -204,7 +247,7 @@ sürükleyip çıkarmayı, geri almayı, bayatlamış satırı, proje yönlendir
 klasörün-tek-parça kuralını ya da çıkarma kilidini bozan bir arayüz, bir
 kazanım değil, bir kayıptır.
 
-## 12. Burada hiç doğrulanamayanlar
+## 14. Burada hiç doğrulanamayanlar
 
 Renk, aşağıdaki listede bilerek yok. Bu arayüzü kuran görevlerden üçü rengi
 ekran dışı `ImageRenderer` ile ölçtü — gerçek görünümü render edip pikselleri

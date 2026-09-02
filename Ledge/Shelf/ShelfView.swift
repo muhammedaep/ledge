@@ -222,10 +222,18 @@ struct ShelfView: View {
     /// Matched by containment rather than stored on the record, because
     /// `MoveRecord` deliberately records where a file was *found* — that is
     /// what undo needs — and a project changes only where it went.
+    ///
+    /// The deepest matching folder wins, not the first: `Project.choosing`
+    /// dedupes identical folders but nothing stops one project's folder from
+    /// sitting inside another's, and the first match in `state.projects`
+    /// would then name the outer project for a file that was actually filed
+    /// into the inner one — wrong in the one line whose entire job is saying
+    /// where a file went.
     private func projectName(for record: MoveRecord) -> String? {
-        state.projects.first { project in
-            record.to.path.hasPrefix(project.folder.path + "/")
-        }?.name
+        state.projects
+            .filter { record.to.path.hasPrefix($0.folder.path + "/") }
+            .max { $0.folder.path.count < $1.folder.path.count }?
+            .name
     }
 
     /// Organize, Settings and Quit. Rendered outside `shelf` so that no state —
@@ -364,7 +372,7 @@ struct ShelfView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .font(.system(size: 11, weight: .medium))
+                    .actionLink()
                     .foregroundStyle(Theme.Colour.amber)
                     .underline()
                 }
@@ -492,7 +500,7 @@ struct ShelfView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Button("End") { state.setActiveProject(nil) }
                     .buttonStyle(.plain)
-                    .font(.system(size: 11, weight: .medium))
+                    .actionLink()
                     .foregroundStyle(Theme.Colour.accent)
                     .accessibilityLabel(Text("End project \(project.name)"))
             }

@@ -190,6 +190,14 @@ struct RulesPane: View {
     /// Where a category sits, so a row can tell whether it has anywhere to move.
     private func position(of id: Category.ID) -> RowPosition {
         guard let index = draft.categories.firstIndex(where: { $0.id == id }) else {
+            // Unreachable today: `list` only ever calls this with a
+            // `category.id` it just read by iterating `draft.categories`, so
+            // the lookup above cannot fail. Left as a real `RowPosition`
+            // rather than a `fatalError` because the cost of being wrong
+            // changed the day `index` became the visible gutter number — a
+            // future caller that broke this invariant would not crash, it
+            // would silently number a card "1" while it sat somewhere else
+            // in the list.
             return RowPosition(index: 0, canMoveUp: false, canMoveDown: false)
         }
         return RowPosition(
