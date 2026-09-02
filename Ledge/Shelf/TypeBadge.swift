@@ -35,11 +35,18 @@ struct TypeBadge: View {
 
     /// Up to four characters, uppercased for the drawing only.
     ///
-    /// `uppercased()` is safe here and nowhere else in this app: an extension is
-    /// an ASCII token by the time it reaches this view — `RuleEditing`
-    /// normalises it and `URL.pathExtension` produces it — so the Turkish `İ`
-    /// case that this project has hit twice cannot arise. It is not a
-    /// user-authored sentence.
+    /// The extension arrives raw from `URL.pathExtension`, which promises
+    /// nothing about its characters — macOS allows non-ASCII filenames, so
+    /// this is not guaranteed to be Latin text. `uppercased()` is used anyway
+    /// because this label is decorative and `accessibilityHidden`: for a
+    /// non-Latin extension the case-map may read oddly, but nothing reads it,
+    /// so nothing breaks.
+    ///
+    /// This is not a licence to use `uppercased()` elsewhere. Anywhere the
+    /// user reads a sentence, the uppercase belongs in the string catalog —
+    /// SwiftUI and Foundation fold `String.uppercased()` without a locale,
+    /// and it turns the Turkish `İ` into a dotless `I`. This project has hit
+    /// that twice.
     private var label: String {
         String(fileExtension.prefix(4)).uppercased()
     }
