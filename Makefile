@@ -122,10 +122,15 @@ export-app: archive
 # lone binary they have to know what to do with. A macro, because `notarize`
 # packages the DMG again after stapling the app, and a `dmg` prerequisite
 # would re-export first and throw that staple away.
+# The image is signed too. hdiutil writes an unsigned image, and notarizing
+# one is allowed — but Gatekeeper then reports "no usable signature" for the
+# image itself, and only the app inside carries a verdict. Signed, both do.
+SIGN_ID ?= Developer ID Application
 define PACKAGE_DMG
 	rm -rf $(STAGE) $(DMG) && mkdir -p $(STAGE) && cp -R $(EXPORT)/$(APP).app $(STAGE)/ && \
 	ln -s /Applications $(STAGE)/Applications && \
-	hdiutil create -volname $(APP) -srcfolder $(STAGE) -ov -format UDZO $(DMG)
+	hdiutil create -volname $(APP) -srcfolder $(STAGE) -ov -format UDZO $(DMG) && \
+	codesign --force --sign "$(SIGN_ID)" --timestamp $(DMG)
 endef
 
 dmg: export-app
