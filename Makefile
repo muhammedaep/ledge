@@ -129,6 +129,15 @@ export-app: archive
 # notarized and stapled, and Gatekeeper's verdict is on the app inside, which
 # is what it launches. A local Developer ID Application certificate (portal →
 # Certificates → +, from a CSR made here) would let both be signed.
+# The credential profile is read from a named keychain file when
+# NOTARY_KEYCHAIN is set. Left unset, notarytool uses its default store, which
+# on this machine turned out to be intermittently unreadable by new processes
+# while a running one kept working — twice in one day, cause not established.
+# A profile stored with `store-credentials --keychain <file>` lives in that
+# file and is visible to `security find-generic-password`, which is the check
+# that answers "is it still there".
+NOTARY_KEYCHAIN ?=
+NOTARY_KEYCHAIN_FLAG = $(if $(NOTARY_KEYCHAIN),--keychain $(NOTARY_KEYCHAIN),)
 SIGN_ID ?= Developer ID Application
 define PACKAGE_DMG
 	rm -rf $(STAGE) $(DMG) && mkdir -p $(STAGE) && cp -R $(EXPORT)/$(APP).app $(STAGE)/ && \
@@ -153,16 +162,16 @@ dmg: export-app
 define NOTARIZE
 	@idfile=$(BUILD)/notary-$(2).id; \
 	if [ -s "$$idfile" ]; then id=$$(cat "$$idfile"); echo "Resuming $(1): submission $$id"; \
-	else id=$$(xcrun notarytool submit $(1) --keychain-profile $(NOTARY_PROFILE) --output-format json \
+	else id=$$(xcrun notarytool submit $(1) --keychain-profile $(NOTARY_PROFILE) $(NOTARY_KEYCHAIN_FLAG) --output-format json \
 	        | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])') || exit 1; \
 	     echo "$$id" > "$$idfile"; echo "Submitted $(1): $$id"; fi; \
-	until xcrun notarytool wait "$$id" --keychain-profile $(NOTARY_PROFILE) --timeout 2h; do \
+	until xcrun notarytool wait "$$id" --keychain-profile $(NOTARY_PROFILE) $(NOTARY_KEYCHAIN_FLAG) --timeout 2h; do \
 	  echo "Lost the connection to Apple while waiting; asking again in 30s."; sleep 30; done; \
-	status=$$(xcrun notarytool info "$$id" --keychain-profile $(NOTARY_PROFILE) --output-format json \
+	status=$$(xcrun notarytool info "$$id" --keychain-profile $(NOTARY_PROFILE) $(NOTARY_KEYCHAIN_FLAG) --output-format json \
 	        | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])'); \
 	echo "Apple says: $$status"; \
 	if [ "$$status" != "Accepted" ]; then echo "Apple did not accept $(1). Its log:"; \
-	  xcrun notarytool log "$$id" --keychain-profile $(NOTARY_PROFILE); exit 1; fi
+	  xcrun notarytool log "$$id" --keychain-profile $(NOTARY_PROFILE) $(NOTARY_KEYCHAIN_FLAG); exit 1; fi
 endef
 
 # Twice, on purpose. The app first, so the copy a user drags into
