@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 import LedgeCore
 
 /// One filed download: its icon, its name, the folder it went into, and the
@@ -82,16 +83,17 @@ struct ShelfRow: View {
     /// Whether the file is there *now*, re-read at gesture time rather than
     /// trusted from `isPresent`, which may be a sweep out of date.
     ///
-    /// This check is load-bearing, and that is measured rather than assumed:
-    /// `NSItemProvider(contentsOf:)` returns a perfectly good provider for a
-    /// file that does not exist. It derives its type from the path extension
-    /// and never stats the file — checked on 2026-09-01 against a missing file
-    /// with a known extension, with no extension, with an unknown extension,
-    /// and with no parent directory at all. Every one produced a non-nil
-    /// provider advertising `public.file-url`. So nothing downstream catches a
-    /// stale row; without this the drag hands the drop target a dangling URL.
-    /// Do not simplify it away on the reasonable-looking grounds that the
-    /// initializer returns nil for a missing file. It does not.
+    /// This check is load-bearing, and that is measured rather than assumed.
+    /// The provider the drag hands out wraps whatever URL it is given and never
+    /// touches the filesystem — its predecessor, `NSItemProvider(contentsOf:)`,
+    /// was checked on 2026-09-01 against a missing file with a known extension,
+    /// with no extension, with an unknown extension, and with no parent
+    /// directory at all, and every one produced a non-nil provider advertising
+    /// `public.file-url`; the `NSItemProvider(item:typeIdentifier:)` that
+    /// replaced it takes an arbitrary `NSURL` and cannot do better. So nothing
+    /// downstream catches a stale row; without this the drag hands the drop
+    /// target a dangling URL. Do not simplify it away on the reasonable-looking
+    /// grounds that a provider for a missing file would be nil. It is not.
     ///
     /// `isPresent` short-circuits it, which also keeps the common stale case
     /// from touching the filesystem on the main actor at all.
@@ -177,10 +179,15 @@ struct ShelfRow: View {
         .animation(.easeOut(duration: 0.12), value: isHovered)
         .onDrag {
             guard isStillThere() else { return NSItemProvider() }
-            // Optional in signature only. The empty provider is not a second
-            // line of defence — it is what an unconstructible provider would
-            // degrade to, and it carries nothing.
-            return NSItemProvider(contentsOf: record.to) ?? NSItemProvider()
+            // `public.file-url` and nothing else — the shape Finder's own
+            // drags have. `NSItemProvider(contentsOf:)` registers the file's
+            // content type as well, as a *file representation*, and a drop
+            // target that asks for that one is handed a nameless temporary
+            // copy — `.com.apple.Foundation.NSItemProvider.XXXXXX.pdf` — in
+            // place of the file. Seen on 2026-09-03 dropping an invoice. The
+            // row's one job is to hand over the real file.
+            return NSItemProvider(item: record.to as NSURL,
+                                  typeIdentifier: UTType.fileURL.identifier)
         }
         .onTapGesture {
             // A stale row does nothing. Revealing it would open the parent
