@@ -29,7 +29,7 @@ LANGUAGE := tr
 .DEFAULT_GOAL := help
 # `export-app`, not `export`: `export` is a GNU Make directive, and a target
 # sharing that name is asking a future make version to reinterpret the line.
-.PHONY: help test build strings clean archive export-app dmg notarize verify \
+.PHONY: help test build strings clean archive export-app dmg notarize notarize-resume verify \
         release require-team require-notary
 
 help:
@@ -123,12 +123,9 @@ export-app: archive
 # packages the DMG again after stapling the app, and a `dmg` prerequisite
 # would re-export first and throw that staple away.
 define PACKAGE_DMG
-	rm -rf $(STAGE) $(DMG)
-	mkdir -p $(STAGE)
-	cp -R $(EXPORT)/$(APP).app $(STAGE)/
-	ln -s /Applications $(STAGE)/Applications
-	hdiutil create -volname $(APP) -srcfolder $(STAGE) \
-		-ov -format UDZO $(DMG)
+	rm -rf $(STAGE) $(DMG) && mkdir -p $(STAGE) && cp -R $(EXPORT)/$(APP).app $(STAGE)/ && \
+	ln -s /Applications $(STAGE)/Applications && \
+	hdiutil create -volname $(APP) -srcfolder $(STAGE) -ov -format UDZO $(DMG)
 endef
 
 dmg: export-app
@@ -162,13 +159,23 @@ endef
 # then the DMG built from that stapled app, so the disk image opens cleanly
 # too. Stapling only the DMG leaves the installed app dependent on an online
 # lookup at first launch.
-notarize: require-notary export-app
+define NOTARIZE_ALL
 	@[ -s $(BUILD)/notary-app.id ] || { rm -f $(BUILD)/$(APP).zip; ditto -c -k --keepParent $(EXPORT)/$(APP).app $(BUILD)/$(APP).zip; }
 	$(call NOTARIZE,$(BUILD)/$(APP).zip,app)
 	xcrun stapler staple $(EXPORT)/$(APP).app
-	$(PACKAGE_DMG)
+	@[ -s $(BUILD)/notary-dmg.id ] || { $(PACKAGE_DMG); }
 	$(call NOTARIZE,$(DMG),dmg)
 	xcrun stapler staple $(DMG)
+endef
+
+notarize: require-notary export-app
+	$(NOTARIZE_ALL)
+
+# The same steps without the export in front: for a run that was cut off
+# while Apple was still thinking. Same bytes, same submission ids.
+notarize-resume: require-notary
+	@test -d $(EXPORT)/$(APP).app || { echo "Nothing to resume: no app at $(EXPORT)/$(APP).app."; exit 1; }
+	$(NOTARIZE_ALL)
 
 # The check that answers the question users care about: does Gatekeeper open
 # it without a right-click. It runs on what will ship — the stapled app and
