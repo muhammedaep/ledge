@@ -48,8 +48,8 @@ public final class FolderWatcher: @unchecked Sendable {
     private let reconnectPollInterval: DispatchTimeInterval
     private let reconnectLeeway: DispatchTimeInterval
     private let emptinessSettleDelay: DispatchTimeInterval
-    private let queue = DispatchQueue(label: "com.ledge.folder-watcher")
-    private let deliveryQueue = DispatchQueue(label: "com.ledge.folder-watcher.delivery")
+    private let queue = DispatchQueue(label: "studio.muhammed.ledge.folder-watcher")
+    private let deliveryQueue = DispatchQueue(label: "studio.muhammed.ledge.folder-watcher.delivery")
 
     // Confined to `queue` — see the type doc above.
     private var watches: [URL: Watch] = [:]

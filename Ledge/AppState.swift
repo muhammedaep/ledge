@@ -89,7 +89,7 @@ final class AppState {
     /// (see `stopWatching()`), and the global queue is concurrent — it dequeues
     /// in FIFO order but makes no promise about which block reaches the
     /// watcher's own queue first.
-    private let watcherQueue = DispatchQueue(label: "com.ledge.watcher-lifecycle", qos: .utility)
+    private let watcherQueue = DispatchQueue(label: "studio.muhammed.ledge.watcher-lifecycle", qos: .utility)
 
     init() {
         rules = rulesStore.load()
