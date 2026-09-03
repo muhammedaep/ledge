@@ -139,7 +139,7 @@ dmg: export-app
 define NOTARIZE
 	xcrun notarytool submit $(1) --keychain-profile $(NOTARY_PROFILE) --wait \
 	|| { echo "Apple refused $(1). Its log:"; \
-	     xcrun notarytool log "$$$$(xcrun notarytool history --keychain-profile $(NOTARY_PROFILE) --output-format json \
+	     xcrun notarytool log "$$(xcrun notarytool history --keychain-profile $(NOTARY_PROFILE) --output-format json \
 	         | python3 -c 'import json,sys; print(json.load(sys.stdin)["history"][0]["id"])')" \
 	         --keychain-profile $(NOTARY_PROFILE); exit 1; }
 endef
