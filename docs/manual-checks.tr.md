@@ -42,7 +42,8 @@ görmelisin, ki o da 10. kontrol.
 `~/Downloads` içine bir dosya bırak, yaklaşık beş saniye bekle, menü çubuğu
 ikonuna tıkla. Satır, altında hedefiyle birlikte görünür.
 
-**Satırı masaüstüne sürükle.** Dosya oraya düşmeli.
+**Satırı masaüstüne sürükle.** Dosya oraya düşmeli — bir kopyası; dosyalanmış
+olan yerinde kalır, undo'yu çalışır tutan da bu (bkz. `known-limitations.md`).
 
 Bu çalışmıyorsa gerisinin önemi yok: sürükleyip çıkarma olmadan kural tabanlı
 klasörleme sadece bir düzenleyicidir, oysa bütün önerme ikisini birden yapmaktı.
@@ -69,8 +70,8 @@ Sonra dosyayı geri taşı ve rafı tekrar aç. Satır yeniden canlanmalı.
 
 ## 4. Proje modu indirilenleri yönlendiriyor
 
-Rafın üstündeki hedef menüsünü aç, **Choose Project…** (Proje Seç…) seç ve bir
-klasör belirle. Başlık o klasörü adıyla anmalı ve menü çubuğu ikonunun şekli
+Rafın üstündeki hedef chip'ine tıkla, açılan listeden **Choose Project…**
+(Proje Seç…) seç ve bir klasör belirle. Başlık o klasörü adıyla anmalı ve menü çubuğu ikonunun şekli
 değişmeli.
 
 Bir şey indir. `~/Downloads` içine değil, o projenin kategori alt klasörüne
@@ -220,19 +221,21 @@ kombinasyonun her birinde:
   etiket — ve uzantısız dosyanın rozetinde hiç harf olmamalı. Bu durumu
   tasarım panoları hiç çizmedi; şimdiye kadar kimse bakmadı.
 - Koyu temada bir Documents, Images ya da Videos rozetine yakından bak.
-  Panolar yalnızca açık temadaki renkli rozet ailelerinin değerlerini verdi;
-  koyu temadaki sayfa ve kenarlık (koyu etiket renginin üzerinde %14 ve %28
-  opaklık) bu dalın kendi icadı ve hiçbir pano bunları doğrulamıyor.
+  Koyu temadaki sayfa ve kenarlık (ailenin koyu etiket renginin üzerinde %16
+  ve %45 opaklık; görsellerde %18 ve %50) tasarım kaynağının kendi koyu
+  değerleri, tahmin değil dosyadan okundu — ama henüz kimse ekranda görmedi.
 - Boş bir rafla, ya da henüz hiçbir şey klasörlenmemiş yeni bir izlenen
   klasörle, boş durumu oku: `Nothing filed yet` (Henüz klasörlenen bir şey
   yok) ve altında `New downloads appear here — drag any row to use the
   file.` (Yeni indirilenler burada görünür — dosyayı kullanmak için satırı
   sürükleyin.) — uygulamanın ürünü açıkladığı tek satır.
-- Rafın üstündeki hedef chip'inin menüsünü aç. Her izlenen klasörün
-  varsayılanını, her projeyi (aktif olanın yanında bir onay işaretiyle) ve
-  en altta `Choose Project…` (Proje Seç…) seçeneğini listelemeli. Chip'in
-  kendisi: bir klasör adı, bir `▸`, ve beyaz bir şevronla 16×16'lık vurgu
-  mavisi bir açılır kare.
+- Rafın üstündeki hedef chip'ine tıkla. Panelin içinde bir liste açılmalı —
+  menü değil, menü paneli kapatırdı — her izlenen klasörün varsayılanı, her
+  proje (aktif olanın yanında bir onay işareti, satır sonunda bir eksi) ve
+  en altta `Choose Project…` (Proje Seç…). Bir projenin eksisine tıkla: satır
+  gider, panel açık kalır, aktif proje oysa chip izlenen klasöre döner.
+  Diskteki klasöre dokunulmaz. Chip'in kendisi: bir klasör adı, bir `▸`, ve
+  beyaz bir şevronla 16×16'lık vurgu mavisi bir açılır kare.
 - Bir proje aktifken, başlık bloğunun tamamı arkasında hafif bir vurgu tonu
   taşımalı — yalnızca etiketin `FILING INTO` yerine `PROJECT MODE`
   okunmasıyla kalmamalı.

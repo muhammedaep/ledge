@@ -37,7 +37,9 @@ does nothing, and that is itself check 10.
 Drop a file in `~/Downloads`, wait about five seconds, click the menu bar icon.
 The row appears with its destination beneath it.
 
-**Drag the row onto the Desktop.** The file should land there.
+**Drag the row onto the Desktop.** The file should land there — a copy of it;
+the filed one stays put, which is what keeps undo working (see
+`known-limitations.md`).
 
 If this does not work, nothing else matters: rule-based filing without drag-out is
 just an organiser, and the whole premise was doing both.
@@ -64,8 +66,8 @@ Then move the file back and reopen. The row should come alive again.
 
 ## 4. Project mode routes downloads
 
-Open the shelf's destination menu at the top, choose **Choose Project…**, and pick
-a folder. The header should name it and the menu bar icon should change shape.
+Click the destination chip at the top of the shelf, choose **Choose Project…** from
+the list that unfolds, and pick a folder. The header should name it and the menu bar icon should change shape.
 
 Download something. It should land in that project's category subfolder, not in
 `~/Downloads`.
@@ -206,17 +208,21 @@ the four combinations:
   label — and the extensionless file's badge should carry no letters at all.
   The boards never drew this case; nobody has looked at it yet.
 - Look closely at a Documents, Images or Videos badge in dark mode. The
-  boards only give light-mode values for the coloured badge families; the
-  dark page and border (14% and 28% opacity over the dark label colour) are
-  this branch's own invention and no board confirms them.
+  dark page and border (16% and 45% opacity over the family's dark label
+  colour; 18% and 50% for images) are the design source's own dark values,
+  read from the file rather than guessed — but nobody has seen them lit.
 - With an empty shelf, or a fresh watched folder with nothing filed yet, read
   the empty state: `Nothing filed yet`, and beneath it
   `New downloads appear here — drag any row to use the file.` — the only
   line in the app that explains the product.
-- Open the destination chip's menu at the top of the shelf. It should list
-  every watched-folder default, every project with a checkmark on the active
-  one, and `Choose Project…` at the bottom. The chip itself: a folder name, a
-  `▸`, and a 16×16 accent-blue disclosure square carrying a white chevron.
+- Click the destination chip at the top of the shelf. A list unfolds inside
+  the panel — not a menu, which would close it — with every watched-folder
+  default, every project with a checkmark on the active one and a minus at
+  its trailing end, and `Choose Project…` at the bottom. Click a project's
+  minus: the row goes, the panel stays open, and if that was the active
+  project the chip falls back to the watched folder. The folder on disk is
+  untouched. The chip itself: a folder name, a `▸`, and a 16×16 accent-blue
+  disclosure square carrying a white chevron.
 - With a project active, the whole header block should carry a faint accent
   tint behind it — not just the label text reading `PROJECT MODE` instead of
   `FILING INTO`.

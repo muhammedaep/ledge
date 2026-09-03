@@ -40,7 +40,6 @@ enum Theme {
         /// the 44 was judged against a build where a misplaced frame meant the
         /// value never reached the layer that draws the box.
         static let popup: CGFloat = 34
-        static let row: CGFloat = 46
         static let footer: CGFloat = 38
         static let badge: CGFloat = 32
     }
@@ -77,7 +76,6 @@ enum Theme {
         static let pill: CGFloat = 6
         static let row: CGFloat = 7
         static let card: CGFloat = 8
-        static let window: CGFloat = 10
         static let panel: CGFloat = 11
     }
 
@@ -175,22 +173,17 @@ enum Theme {
                 : dynamic(light: srgb(0xf2f0ef), dark: srgb(0x2d2b2e))
         }
 
-        /// `--sep`. The hairline under the shelf's footer and the Settings
-        /// toolbar. Both drew a system `Divider()`, which is not this colour.
-        static let separator = dynamic(light: white(0, 0.09), dark: white(1, 0.10))
-
         /// One neutral in both themes, so a hover never has to know the theme.
         static let hover = Color(white: 0.5, opacity: 0.16)
         static let hoverStrong = Color(white: 0.5, opacity: 0.18)
 
         /// A colour that answers differently in each theme.
         ///
-        /// In Swift rather than an asset catalog on purpose. This target has no
-        /// catalog and its project file lists every resource by hand, so adding
-        /// one is project-file surgery — and a catalog colour whose name is
-        /// wrong does not fail the build, it renders as a placeholder at
-        /// runtime. Nobody on this project can see runtime. Here a typo is a
-        /// compile error.
+        /// In Swift rather than the asset catalog on purpose. The catalog holds
+        /// the app icon and the accent colour macOS asks for, nothing else —
+        /// a catalog colour whose name is wrong does not fail the build, it
+        /// renders as a placeholder at runtime, and nobody on this project can
+        /// see runtime. Here a typo is a compile error.
         private static func dynamic(light: NSColor, dark: NSColor) -> Color {
             Color(nsColor: NSColor(name: nil) { appearance in
                 appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
@@ -490,5 +483,20 @@ struct SheetButtonStyle: ButtonStyle {
             }
             .themeShadow(Theme.Shadow.button)
             .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
+    }
+}
+
+/// A row in a list drawn inside the shelf: neutral at rest, filled on hover.
+struct HoverRowButtonStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background {
+                RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+                    .fill(configuration.isPressed || isHovered
+                          ? Theme.Colour.hover : Color.clear)
+            }
+            .onHover { isHovered = $0 }
     }
 }

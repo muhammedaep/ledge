@@ -20,12 +20,9 @@ struct ShelfView: View {
     @State private var rowsHeight: CGFloat = 0
     /// Height at the moment a resize drag began, so the drag is relative.
     @State private var heightAtDragStart: Double?
-    /// The destination chip's frame, so its menu hangs off the chip rather
     /// than off the pointer.
-    @State private var chipFrame: CGRect = .zero
-    /// Keeps the menu's closures alive while it is on screen. `NSMenuItem`
-    /// carries a target/action pair, not a closure, so something has to.
-    @State private var menuActions = MenuActions()
+    /// Whether the destination list is open under the chip.
+    @State private var isPickingDestination = false
     /// The height while a drag is in flight, before it is committed.
     ///
     /// Local on purpose. Writing each drag increment straight to `Preferences`
@@ -596,19 +593,26 @@ struct ShelfView: View {
             }
 
             ChipButton(title: state.activeProject?.name ?? defaultDestinationName) {
-                NSApplication.shared.activate(ignoringOtherApps: true)
-                showDestinationMenu()
+                isPickingDestination.toggle()
             }
             .accessibilityLabel(Text("Filing into"))
-            // Where to hang the menu from. Read rather than guessed, because
-            // the chip's own frame is the only thing that knows it.
-            .background(
-                GeometryReader { proxy in
-                    Color.clear.preference(key: ChipFrame.self,
-                                           value: proxy.frame(in: .global))
-                }
-            )
-            .onPreferenceChange(ChipFrame.self) { chipFrame = $0 }
+
+            // The list opens *inside* the panel, not as an `NSMenu`.
+            //
+            // Measured, after a menu was tried and shipped: a menu takes key
+            // from the window it opens over, and `MenuBarExtra(style: .window)`
+            // closes its panel the moment that panel is no longer key. The log
+            // read `resignKey visible=1 appActive=1` and the panel was gone
+            // before the next event. So every attempt to change destination
+            // shut the shelf and the user had to reopen it from the menu bar
+            // and start again. Nothing configurable on the panel prevents it —
+            // `hidesOnDeactivate` covers deactivation, not loss of key.
+            //
+            // Staying in one window means key never moves, so the shelf cannot
+            // be dismissed by its own control.
+            if isPickingDestination {
+                destinationList
+            }
 
             if state.activeProject != nil {
                 Text("All new downloads go here until you end the project.")
@@ -649,26 +653,82 @@ struct ShelfView: View {
         }
     }
 
-    /// Builds and shows the destination menu, anchored under the chip.
-    ///
-    /// `.state` on the item is the checkmark — a menu item has one for exactly
-    /// this, where the SwiftUI version had to fake it with an SF Symbol name
-    /// that was sometimes the empty string.
-    @MainActor private func showDestinationMenu() {
-        var items: [(title: String, checked: Bool, run: () -> Void)] = [
-            (defaultDestinationName, state.activeProject == nil,
-             { state.setActiveProject(nil) })
-        ]
-        for project in state.projects {
-            items.append((project.name,
-                          state.activeProject?.id == project.id,
-                          { state.setActiveProject(project) }))
+    /// The destinations, drawn in the panel under the chip.
+    private var destinationList: some View {
+        VStack(spacing: 1) {
+            destinationRow(defaultDestinationName,
+                           isActive: state.activeProject == nil) {
+                state.setActiveProject(nil)
+            }
+            ForEach(state.projects) { project in
+                // Removing goes through `updateProjects`, which drops the
+                // active destination back to the watched folder if this was
+                // it — the same path General takes. The list stays open: the
+                // user is editing it, not choosing from it.
+                destinationRow(project.name,
+                               isActive: state.activeProject?.id == project.id,
+                               remove: {
+                                   state.updateProjects(state.projects.filter { $0.id != project.id })
+                               }) {
+                    state.setActiveProject(project)
+                }
+            }
+            Divider().padding(.vertical, 3)
+            destinationRow(String(localized: "Choose Project…"), isActive: false) {
+                chooseProject()
+            }
         }
-        let separator = items.count
-        items.append((String(localized: "Choose Project…"), false, { chooseProject() }))
+        .padding(.top, 5)
+    }
 
-        menuActions.show(items, separatorBefore: separator,
-                         under: chipFrame, in: shelfWindow)
+    /// `remove`, when given, puts a minus at the row's trailing end. Projects
+    /// get one; the watched folder and `Choose Project…` do not.
+    private func destinationRow(_ title: String,
+                                isActive: Bool,
+                                remove: (() -> Void)? = nil,
+                                select: @escaping () -> Void) -> some View {
+        Button {
+            select()
+            isPickingDestination = false
+        } label: {
+            HStack(spacing: 7) {
+                // The checkmark keeps its width when absent, so the names stay
+                // on one left edge instead of shifting as the choice changes.
+                Image(systemName: "checkmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .opacity(isActive ? 1 : 0)
+                    .frame(width: 10)
+                Text(title)
+                    .rowName()
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                // Room for the minus, so a long name truncates before it
+                // rather than running underneath it.
+                Spacer(minLength: remove == nil ? 0 : 24)
+            }
+            .padding(.horizontal, 9)
+            .frame(height: 26)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(HoverRowButtonStyle())
+        // Beside the row's button rather than inside its label: a button
+        // nested in another button's label shares its press, and a click on
+        // the minus would also select the project it was removing.
+        .overlay(alignment: .trailing) {
+            if let remove {
+                Button(role: .destructive, action: remove) {
+                    Image(systemName: "minus.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Colour.textTertiary)
+                        .frame(width: 24, height: 26)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 3)
+                .accessibilityLabel(Text("Remove project"))
+                .help(Text("Remove project"))
+            }
+        }
     }
 
     private func chooseProject() {
