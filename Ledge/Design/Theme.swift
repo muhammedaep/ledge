@@ -28,12 +28,18 @@ enum Theme {
     enum Size {
         static let field: CGFloat = 22
         static let button: CGFloat = 26
-        /// The destination chip. `.pop { height: 28px }` in the design source.
+        /// The destination chip.
         ///
-        /// Taken from the file, not from reading a screenshot: guessing from
-        /// the rendering put this at 36 and then 46, both wrong, and the second
-        /// made the chip taller than the rows it sits above.
-        static let popup: CGFloat = 28
+        /// A deliberate departure, asked for directly: the design source says
+        /// `.pop { height: 28px }` and this is 34.
+        ///
+        /// 28 read as slighter than the rows it leads. 44 — a row's own height
+        /// — was worse the other way: a row spends its 44 on a 32pt badge,
+        /// while the chip holds 13pt text, so the same number leaves it mostly
+        /// empty. 34 is the middle, and it is the one that was actually seen:
+        /// the 44 was judged against a build where a misplaced frame meant the
+        /// value never reached the layer that draws the box.
+        static let popup: CGFloat = 34
         static let row: CGFloat = 46
         static let footer: CGFloat = 38
         static let badge: CGFloat = 32
@@ -75,7 +81,17 @@ enum Theme {
         /// the rows both — the design shares them deliberately, and inventing a
         /// second pair to "separate" them was a guess that the source does not
         /// support.
-        static let chipFill = dynamic(light: white(1, 0.72), dark: white(1, 0.075))
+        /// `--chipbg`, except on black.
+        ///
+        /// Dark keeps the source's 0.075 exactly. Black raises it to 0.10,
+        /// which is not a second opinion about the design: 7.5% white reads as
+        /// a card against `rgba(43,43,46,.78)` and all but disappears against
+        /// an actual black, so the ground change drags this one with it.
+        @MainActor static var chipFill: Color {
+            Theme.isBlack
+                ? Color(nsColor: white(1, 0.10))
+                : dynamic(light: white(1, 0.72), dark: white(1, 0.075))
+        }
         static let chipBorder = dynamic(light: white(0, 0.07), dark: white(1, 0.07))
         static let fieldFill = dynamic(light: white(1, 1), dark: white(1, 0.06))
         static let fieldBorder = dynamic(light: white(0, 0.14), dark: white(1, 0.14))
@@ -105,6 +121,25 @@ enum Theme {
         static let badgeMoviePage = dynamic(light: srgb(0xf0ebfb), dark: srgb(190, 150, 240, 0.16))
         static let badgeMovieBorder = dynamic(light: srgb(0xd0c2ee), dark: srgb(190, 150, 240, 0.45))
         static let badgeMovieLabel = dynamic(light: srgb(0x7a5bc0), dark: srgb(0xc3a3ef))
+
+        /// What Ledge paints over the panel's material.
+        ///
+        /// Nothing in light and nothing in Dark — there the material and the
+        /// design's own `rgba(43,43,46,.78)` do the work. Black paints an
+        /// actual black over it. macOS has one dark appearance, so a dynamic
+        /// colour cannot tell the two apart; `Theme.isBlack` is that fact
+        /// made explicit rather than hidden in a colour closure.
+        @MainActor static var panelGround: Color {
+            Theme.isBlack ? Color(nsColor: white(0, 0.90)) : .clear
+        }
+
+        /// The Settings window's ground: the design's `#f2f0ef` / `#2d2b2e`,
+        /// or black when Black is chosen.
+        @MainActor static var windowGround: Color {
+            Theme.isBlack
+                ? Color(nsColor: white(0, 1))
+                : dynamic(light: srgb(0xf2f0ef), dark: srgb(0x2d2b2e))
+        }
 
         /// `--sep`. The hairline under the shelf's footer and the Settings
         /// toolbar. Both drew a system `Divider()`, which is not this colour.
@@ -262,11 +297,20 @@ extension Theme {
     /// change: every colour in this file resolves through
     /// `appearance.bestMatch(from: [.aqua, .darkAqua])`, so the palette follows
     /// from this single assignment. `nil` hands control back to the system.
+    /// Whether the Black appearance is the one in force.
+    ///
+    /// Read by the three tokens that differ between Dark and Black. It has to
+    /// live here because macOS has exactly two appearances and both of those
+    /// settings map onto `darkAqua` — no dynamic colour can see the
+    /// difference, so something has to hold it.
+    @MainActor private(set) static var isBlack = false
+
     @MainActor static func apply(_ setting: AppearanceSetting) {
+        isBlack = setting == .black
         NSApplication.shared.appearance = switch setting {
         case .system: nil
         case .light: NSAppearance(named: .aqua)
-        case .dark: NSAppearance(named: .darkAqua)
+        case .dark, .black: NSAppearance(named: .darkAqua)
         }
     }
 }

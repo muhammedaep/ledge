@@ -199,6 +199,22 @@
         }
       }
     },
+    "Black": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Black"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siyah"
+          }
+        }
+      }
+    },
     "By ext.": {
       "localizations": {
         "en": {
@@ -581,6 +597,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "İndirilenleri otomatik klasörle"
+          }
+        }
+      }
+    },
+    "Filing into": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filing into"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şuraya dosyalanıyor"
           }
         }
       }

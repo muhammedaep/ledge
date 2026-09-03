@@ -146,8 +146,14 @@ struct RulesPane: View {
             }
             Button("Reset to Defaults") { confirmingReset = true }
 
+            // One line, truncating. The footer is a row of controls and this
+            // is the only elastic thing in it, so without a limit it wrapped
+            // to two lines and pushed the button row taller than the buttons.
             Text("Everything else goes to \(draft.fallbackName)")
                 .rowMeta()
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(-1)
 
             Spacer()
 
@@ -541,9 +547,13 @@ private struct CategoryRow: View {
         }
         .padding(1)
         .background {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
                 .fill(Theme.Colour.segmentTrack)
         }
+        // The row's other two fields are elastic and this one is not: without
+        // it the track compressed until "By month" wrapped onto two lines and
+        // the card grew a row taller than its neighbours.
+        .fixedSize()
     }
 
     private func segment(_ title: LocalizedStringKey, _ value: Subdivision) -> some View {
@@ -551,6 +561,8 @@ private struct CategoryRow: View {
         return Button { category.subdivision = value } label: {
             Text(title)
                 .font(.system(size: 11, weight: isOn ? .medium : .regular))
+                .lineLimit(1)
+                .fixedSize()
                 .foregroundStyle(isOn
                                  ? AnyShapeStyle(.primary)
                                  : AnyShapeStyle(Theme.Colour.textSecondary))

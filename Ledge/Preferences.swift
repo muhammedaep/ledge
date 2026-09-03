@@ -7,7 +7,11 @@ import ServiceManagement
 /// `system` is the default and means "follow the system", which is what Ledge
 /// did before this setting existed — an upgrade changes nothing until asked.
 enum AppearanceSetting: String, CaseIterable {
-    case system, light, dark
+    case system, light, dark, black
+
+    /// Both dark cases run on macOS's one dark appearance; `black` differs
+    /// only in what Ledge paints on top of it.
+    var isDarkAppearance: Bool { self == .dark || self == .black }
 }
 
 /// User settings, persisted to `UserDefaults` on every change.

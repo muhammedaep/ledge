@@ -20,6 +20,12 @@ struct ShelfView: View {
     @State private var rowsHeight: CGFloat = 0
     /// Height at the moment a resize drag began, so the drag is relative.
     @State private var heightAtDragStart: Double?
+    /// The destination chip's frame, so its menu hangs off the chip rather
+    /// than off the pointer.
+    @State private var chipFrame: CGRect = .zero
+    /// Keeps the menu's closures alive while it is on screen. `NSMenuItem`
+    /// carries a target/action pair, not a closure, so something has to.
+    @State private var menuActions = MenuActions()
     /// The height while a drag is in flight, before it is committed.
     ///
     /// Local on purpose. Writing each drag increment straight to `Preferences`
@@ -91,7 +97,14 @@ struct ShelfView: View {
         // the web imitates macOS vibrancy. A material is the real thing: it
         // behaves correctly over any wallpaper and in both themes, which a
         // fixed rgba cannot. Spec §8.2.
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
+        .background {
+            let shape = RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous)
+            shape.fill(.regularMaterial)
+            // Drawn over the material, not behind it: a second `.background`
+            // would sit underneath and the material would hide it. Clear in
+            // light, so this costs the light appearance nothing.
+            shape.fill(Theme.Colour.panelGround)
+        }
         .background(WindowReader { window in
             shelfWindow = window
             configure(window)
@@ -567,23 +580,25 @@ struct ShelfView: View {
                  : String(localized: "PROJECT MODE"))
                 .sectionLabel()
 
-            Menu {
-                Button {
-                    state.setActiveProject(nil)
-                } label: {
-                    Label(defaultDestinationName,
-                          systemImage: state.activeProject == nil ? "checkmark" : "")
-                }
-                ForEach(state.projects) { project in
-                    Button {
-                        state.setActiveProject(project)
-                    } label: {
-                        Label(project.name,
-                              systemImage: state.activeProject?.id == project.id ? "checkmark" : "")
-                    }
-                }
-                Divider()
-                Button("Choose Project…", action: chooseProject)
+            // A `Button` and an `NSMenu`, not a SwiftUI `Menu`.
+            //
+            // A macOS `Menu` owns how its label is drawn and how far it takes
+            // clicks, and it disagreed with this design four separate ways: it
+            // discarded the background, border, shadow and trailing control
+            // handed to it inside the label; it sized itself to its text so
+            // the chrome wrapped around it stopped short of the panel; it took
+            // clicks only where the text actually was; and it ignored the
+            // height, keeping the system control's own. Each was fixable by
+            // moving one modifier inside or outside, and each fix broke a
+            // different one of the other three.
+            //
+            // Owning both halves ends the class of bug rather than the
+            // instance. The button draws the chip exactly as the design does
+            // and takes clicks across all of it; the menu is built in AppKit,
+            // where a checkmark on the active destination is one property.
+            Button {
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                showDestinationMenu()
             } label: {
                 HStack(spacing: 7) {
                     // The boards put a filled accent folder at the head of the
@@ -597,67 +612,46 @@ struct ShelfView: View {
                         .destinationName()
                         .lineLimit(1)
                         .truncationMode(.middle)
+
                     Spacer(minLength: 0)
+
+                    // Up-and-down, not a lone chevron: the control picks from a
+                    // list rather than revealing something below it.
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 16, height: 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(Theme.Colour.accent)
+                        )
                 }
+                .padding(.leading, 9)
+                .padding(.trailing, 7)
+                .frame(maxWidth: .infinity)
+                .frame(height: Theme.Size.popup)
+                .background {
+                    RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
+                        .fill(Theme.Colour.chipFill)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
+                        .stroke(Theme.Colour.chipBorder, lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.08), radius: 0.75, y: 0.5)
+                .contentShape(Rectangle())
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            // The chip's chrome is drawn around the `Menu`, not inside its
-            // label, and that is load-bearing rather than tidiness.
-            //
-            // A macOS `Menu` renders its own label: a background, an overlay, a
-            // shadow and a trailing decorated image handed to it inside the
-            // label are all discarded, and only the plain text and icon
-            // survive. Shipped that way, the destination showed as loose text
-            // with an icon — no container and no control — in both themes,
-            // which is what made it look nothing like the boards.
-            // 9 left, and 30 right = the design's 7pt gap, its 16pt control
-            // and its 7pt padding, since that control is an overlay here.
-            .padding(.leading, 9)
-            .padding(.trailing, 30)
-            // A `Menu` is only as wide as its own label, and the chrome wrapped
-            // around it inherited that — so the chip stopped short while every
-            // row beneath it ran the full width, which is what made the header
-            // look like a different design from the list.
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: Theme.Size.popup)
-            .background {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Theme.Colour.chipFill)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(Theme.Colour.chipBorder, lineWidth: 1)
-            }
-            // Up-and-down, not a lone chevron: the control picks from a list
-            // rather than revealing something below it. Non-interactive — the
-            // whole chip is already the menu's hit area, and letting this take
-            // clicks would put a dead square on top of it.
-            .overlay(alignment: .trailing) {
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 16, height: 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Theme.Colour.accent)
-                    )
-                    .padding(.trailing, 7)
-                    .allowsHitTesting(false)
-            }
-            .shadow(color: .black.opacity(0.08), radius: 0.75, y: 0.5)
-            // Opening this menu is a deliberate interaction, so it is the
-            // moment Ledge is allowed to come forward. Without it the click
-            // lands, the menu opens, and the app drops behind whatever was in
-            // front — so the next click goes to that app instead and the user
-            // has to click twice for everything.
-            //
-            // Deliberately here and not in `configure`: activating when the
-            // panel merely *opens* would pull focus off the app the user is
-            // dragging into, which is the whole point of the shelf.
-            .simultaneousGesture(TapGesture().onEnded {
-                NSApplication.shared.activate(ignoringOtherApps: true)
-            })
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Filing into"))
+            // Where to hang the menu from. Read here rather than guessed,
+            // because the chip's own frame is the only thing that knows it.
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(key: ChipFrame.self,
+                                           value: proxy.frame(in: .global))
+                }
+            )
+            .onPreferenceChange(ChipFrame.self) { chipFrame = $0 }
 
             if let project = state.activeProject {
                 Text("All new downloads go here until you end the project.")
@@ -690,6 +684,50 @@ struct ShelfView: View {
         case 1: return folders[0].lastPathComponent
         default: return String(localized: "Each Download's Own Folder")
         }
+    }
+
+    /// Builds and shows the destination menu, anchored under the chip.
+    ///
+    /// AppKit rather than SwiftUI: see the note on the button that calls it.
+    /// The checkmark is `.state`, which is what a menu item has for exactly
+    /// this and what the SwiftUI version had to fake with an SF Symbol name
+    /// that was sometimes the empty string.
+    @MainActor private func showDestinationMenu() {
+        let menu = NSMenu()
+        menuActions.handlers.removeAll()
+
+        func add(_ title: String, checked: Bool, run: @escaping () -> Void) {
+            let item = NSMenuItem(title: title,
+                                  action: #selector(MenuActions.fire(_:)),
+                                  keyEquivalent: "")
+            item.target = menuActions
+            item.tag = menuActions.handlers.count
+            item.state = checked ? .on : .off
+            menuActions.handlers[item.tag] = run
+            menu.addItem(item)
+        }
+
+        add(defaultDestinationName, checked: state.activeProject == nil) {
+            state.setActiveProject(nil)
+        }
+        for project in state.projects {
+            add(project.name, checked: state.activeProject?.id == project.id) {
+                state.setActiveProject(project)
+            }
+        }
+        menu.addItem(.separator())
+        add(String(localized: "Choose Project…"), checked: false) { chooseProject() }
+
+        // Under the chip's bottom-left corner. SwiftUI's global space has its
+        // origin top-left and AppKit's content view bottom-left, so the y has
+        // to be flipped rather than passed through.
+        guard let content = shelfWindow?.contentView, chipFrame != .zero else {
+            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+            return
+        }
+        let point = NSPoint(x: chipFrame.minX,
+                            y: content.bounds.height - chipFrame.maxY)
+        menu.popUp(positioning: nil, at: point, in: content)
     }
 
     private func chooseProject() {
@@ -725,5 +763,23 @@ private struct RowsHeight: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
+    }
+}
+
+/// The chip's frame in the window, reported up so its menu can hang off it.
+private struct ChipFrame: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+/// Holds the destination menu's closures. `NSMenuItem` takes a target and a
+/// selector, so a closure needs an object to live on; the tag is the index.
+@MainActor private final class MenuActions: NSObject {
+    var handlers: [Int: () -> Void] = [:]
+
+    @objc func fire(_ sender: NSMenuItem) {
+        handlers[sender.tag]?()
     }
 }

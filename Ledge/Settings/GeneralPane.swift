@@ -22,6 +22,7 @@ struct GeneralPane: View {
                     Text("System").tag(AppearanceSetting.system)
                     Text("Light").tag(AppearanceSetting.light)
                     Text("Dark").tag(AppearanceSetting.dark)
+                    Text("Black").tag(AppearanceSetting.black)
                 }
                 .onChange(of: preferences.appearance) { _, choice in
                     Theme.apply(choice)

@@ -41,6 +41,12 @@ struct SettingsView: View {
         // whose whole subject is the order of a list is the one that must show
         // enough of the list to reorder it.
         .frame(width: 560, height: 460)
+        // Black in dark, to match the shelf. The design gives this window
+        // `#2d2b2e`; both surfaces moved together on request, and a settings
+        // window that stayed grey while the panel went black would read as a
+        // different app. `.background`, not `.containerBackground(for:
+        // .window)` — that one is macOS 15 and this app supports 14.
+        .background(Theme.Colour.windowGround)
         // The same guard the Organize sheet takes, for the same reason: a
         // watcher failure from an hour ago would otherwise be sitting here when
         // the window opens, reading as a verdict on whatever the user clicks
