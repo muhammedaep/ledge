@@ -87,3 +87,29 @@ import Foundation
 
     #expect(plan.map { $0.source.lastPathComponent } == ["shot.png"])
 }
+
+/// Renaming a rule's capitalisation does not rename its folder on disk. The
+/// on-disk `Images` has to stay reserved when the rule now says `images`, or
+/// the next event files the whole folder — and everything in it — into
+/// `Other/`. The comparison is the one the editor already uses to decide two
+/// names are one folder on a case-insensitive disk.
+@Test func aDestinationFolderStaysReservedWhenTheRuleChangesCase() {
+    let rules = RuleSet(categories: [Category(name: "images", extensions: ["png"])],
+                        fallbackName: "Other")
+    #expect(rules.reservesFolderName("Images"))
+    #expect(rules.reservesFolderName("IMAGES"))
+    #expect(rules.reservesFolderName("other"))
+    #expect(!rules.reservesFolderName("Imaged"))
+}
+
+@Test func scanEngineSkipsADestinationFolderWhoseRuleChangedCase() throws {
+    let temp = try TempDirectory()
+    let rules = RuleSet(categories: [Category(name: "images", extensions: ["png"])],
+                        fallbackName: "Other")
+    try temp.makeDirectory("Images")
+    try temp.writeFile("shot.png")
+
+    let plan = ScanEngine.plan(folder: temp.url, using: rules)
+
+    #expect(plan.map { $0.source.lastPathComponent } == ["shot.png"])
+}

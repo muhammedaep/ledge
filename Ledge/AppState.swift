@@ -404,7 +404,7 @@ final class AppState {
     /// so nothing is lost or duplicated — but the second pass plans sources the
     /// first has already moved, and every one of them comes back as "Couldn't
     /// move …" for a file that is sitting safely where the user asked for it.
-    func apply(_ plan: [PlannedMove], root: URL) async {
+    func apply(_ plan: [PlannedMove]) async {
         guard !isOrganizing else { return }
         isOrganizing = true
         defer { isOrganizing = false }
@@ -414,9 +414,11 @@ final class AppState {
         for planned in plan {
             do {
                 let final = try await moveOffMainActor(planned.source, into: planned.destination.folder)
+                // The source's own parent, not the batch root: `from` is where
+                // undo puts the file back, and it has to be where the file was.
                 try await filing.append(MoveRecord(
                     originalName: planned.source.lastPathComponent,
-                    from: root,
+                    from: planned.source.deletingLastPathComponent(),
                     to: final,
                     batchID: batch
                 ))
@@ -436,7 +438,7 @@ final class AppState {
             // filed. Skipping them is `RuleSet`'s rule, shared with Organize
             // Now; without it `Documents` would itself be filed into `Other/`,
             // taking everything already filed there with it.
-            guard !rules.destinationFolderNames.contains(url.lastPathComponent) else { continue }
+            guard !rules.reservesFolderName(url.lastPathComponent) else { continue }
             guard await settler.settle(url) == .ready else { continue }
             guard let facts = FileFacts(url: url) else { continue }
 

@@ -75,3 +75,34 @@ import Foundation
     let snapshot = DirectorySnapshot(scanning: URL(fileURLWithPath: "/tmp/does-not-exist-\(UUID())"))
     #expect(snapshot.entries.isEmpty)
 }
+
+/// A symlink dropped into a watched folder is an entry *of that folder*. The
+/// scan used to resolve it to its target, and the app then filed the target —
+/// a file it had never been pointed at, anywhere on disk. Found 2026-09-03.
+@Test func aLeafSymlinkIsReportedAtItsOwnPathNotItsTargets() throws {
+    let watched = try TempDirectory()
+    let elsewhere = try TempDirectory()
+    let target = try elsewhere.writeFile("tax.pdf")
+    let link = watched.url.appendingPathComponent("invoice.pdf")
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+
+    let entries = DirectorySnapshot(scanning: watched.url).entries
+    #expect(entries.map(\.lastPathComponent) == ["invoice.pdf"])
+    let folder = watched.url.resolvingSymlinksInPath().standardizedFileURL
+    #expect(entries.allSatisfy {
+        $0.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL == folder
+    })
+}
+
+@Test func aSymlinkToADirectoryElsewhereStaysInsideTheScannedFolder() throws {
+    let watched = try TempDirectory()
+    let elsewhere = try TempDirectory()
+    let target = try elsewhere.makeDirectory("TaxReturns")
+    let link = watched.url.appendingPathComponent("invoices")
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+
+    let entries = DirectorySnapshot(scanning: watched.url).entries
+    #expect(entries.map(\.lastPathComponent) == ["invoices"])
+    let outside = elsewhere.url.resolvingSymlinksInPath().path
+    #expect(!entries.contains { $0.path.hasPrefix(outside) })
+}

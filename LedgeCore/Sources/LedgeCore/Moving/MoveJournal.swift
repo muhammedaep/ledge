@@ -52,6 +52,11 @@ public final class MoveJournal {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let records = try? decoder.decode([MoveRecord].self, from: data) else { return [] }
-        return records.sorted { $0.date > $1.date }
+        // A record's paths are what undo, drag-out and reveal act on, and
+        // `URL` decodes `https://…` as happily as `file://…`. Anything that is
+        // not a file URL never came from this app and is not acted on.
+        return records
+            .filter { $0.from.isFileURL && $0.to.isFileURL }
+            .sorted { $0.date > $1.date }
     }
 }

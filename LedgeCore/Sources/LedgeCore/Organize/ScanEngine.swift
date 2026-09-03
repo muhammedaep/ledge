@@ -38,10 +38,8 @@ public enum ScanEngine {
         let snapshot = DirectorySnapshot(scanning: folder)
 
         // A folder that is itself a destination must not be filed into itself.
-        let reserved = rules.destinationFolderNames
-
         return snapshot.entries
-            .filter { !reserved.contains($0.lastPathComponent) }
+            .filter { !rules.reservesFolderName($0.lastPathComponent) }
             .compactMap { url -> PlannedMove? in
                 guard let facts = factsProvider(url) else { return nil }
                 let destination = Categorizer.destination(for: facts, in: folder, using: rules)

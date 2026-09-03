@@ -111,3 +111,23 @@ private func record(_ name: String, batchID: UUID? = nil, date: Date = Date()) -
 
     #expect(MoveJournal(directory: temp.url).records.isEmpty)
 }
+
+/// The journal is a file in Application Support, and a record's paths are what
+/// undo, drag-out and reveal act on. A `to` that is not even a file URL —
+/// `https://…` decodes without complaint, and its `.path` is a filesystem path
+/// — is dropped on load rather than trusted.
+@Test func aRecordWhosePathsAreNotFileURLsIsDroppedOnLoad() throws {
+    let temp = try TempDirectory()
+    let good = MoveRecord(originalName: "a.png", from: temp.url,
+                          to: temp.url.appendingPathComponent("Images/a.png"))
+    let poisoned = MoveRecord(originalName: "kitten.png",
+                              from: URL(string: "https://evil.example/drop/")!,
+                              to: URL(string: "https://evil.example/etc/passwd")!)
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    try encoder.encode([good, poisoned]).write(to: temp.url.appendingPathComponent("journal.json"))
+
+    let records = MoveJournal(directory: temp.url).records
+
+    #expect(records.map(\.originalName) == ["a.png"])
+}

@@ -354,7 +354,7 @@ struct OrganizeSheet: View {
         guard let root = targetFolder else { return }
         let moves = preview.selectedMoves(excluding: excluded)
         Task {
-            await state.apply(moves, root: root)
+            await state.apply(moves)
             rescanToken += 1
         }
     }

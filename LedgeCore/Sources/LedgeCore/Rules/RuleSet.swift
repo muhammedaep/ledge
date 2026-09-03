@@ -54,6 +54,18 @@ public struct RuleSet: Codable, Equatable, Sendable {
         Set(categories.map(\.name)).union([fallbackName])
     }
 
+    /// Whether an on-disk entry with this name is one of those destinations.
+    ///
+    /// Compared through `Category.folderNameKey`, not by equality: renaming a
+    /// rule's capitalisation does not rename its folder, and on the
+    /// case-insensitive disks Macs ship with `images` and `Images` are one
+    /// folder. An exact match let a user who retyped a rule's name file that
+    /// rule's whole folder into the fallback on the next event.
+    public func reservesFolderName(_ name: String) -> Bool {
+        let key = Category.folderNameKey(name)
+        return destinationFolderNames.contains { Category.folderNameKey($0) == key }
+    }
+
     public static let screenshotsMigration = "screenshots-category"
 
     /// The rule that gives screen captures their own folder.
