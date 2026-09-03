@@ -122,15 +122,21 @@ export-app: archive
 # lone binary they have to know what to do with. A macro, because `notarize`
 # packages the DMG again after stapling the app, and a `dmg` prerequisite
 # would re-export first and throw that staple away.
-# The image is signed too. hdiutil writes an unsigned image, and notarizing
-# one is allowed — but Gatekeeper then reports "no usable signature" for the
-# image itself, and only the app inside carries a verdict. Signed, both do.
+# The image is signed when a Developer ID identity is in the keychain, and
+# ships unsigned otherwise. Xcode signs the app at export through the Apple ID
+# with a cloud-managed certificate — its private key never reaches this Mac —
+# so `codesign` has nothing to sign the image with. An unsigned image is still
+# notarized and stapled, and Gatekeeper's verdict is on the app inside, which
+# is what it launches. A local Developer ID Application certificate (portal →
+# Certificates → +, from a CSR made here) would let both be signed.
 SIGN_ID ?= Developer ID Application
 define PACKAGE_DMG
 	rm -rf $(STAGE) $(DMG) && mkdir -p $(STAGE) && cp -R $(EXPORT)/$(APP).app $(STAGE)/ && \
 	ln -s /Applications $(STAGE)/Applications && \
 	hdiutil create -volname $(APP) -srcfolder $(STAGE) -ov -format UDZO $(DMG) && \
-	codesign --force --sign "$(SIGN_ID)" --timestamp $(DMG)
+	{ security find-identity -v -p codesigning | grep -q "$(SIGN_ID)" \
+	  && codesign --force --sign "$(SIGN_ID)" --timestamp $(DMG) \
+	  || echo "No local '$(SIGN_ID)' identity: the image ships unsigned (notarized and stapled)."; }
 endef
 
 dmg: export-app
@@ -194,7 +200,10 @@ verify:
 	xcrun stapler validate $(EXPORT)/$(APP).app
 	spctl --assess --type exec --verbose=2 $(EXPORT)/$(APP).app
 	xcrun stapler validate $(DMG)
-	spctl --assess --type open --context context:primary-signature --verbose=2 $(DMG)
+	@mnt=$$(hdiutil attach -nobrowse -readonly $(DMG) | grep -o '/Volumes/.*' | head -1); \
+	 echo "Mounted $(DMG) at $$mnt"; \
+	 spctl --assess --type exec --verbose=2 "$$mnt/$(APP).app"; rc=$$?; \
+	 hdiutil detach "$$mnt" -quiet; exit $$rc
 
 release: test notarize verify
 	@echo "Ready: $(DMG)"
