@@ -113,7 +113,9 @@ struct ShelfRow: View {
             VStack(alignment: .leading, spacing: Theme.Space.nameToMeta) {
                 Text(record.originalName)
                     .rowName()
-                    .foregroundStyle(isPresent ? .primary : .secondary)
+                    .foregroundStyle(isPresent
+                                     ? AnyShapeStyle(.primary)
+                                     : AnyShapeStyle(Theme.Colour.textSecondary))
                     .lineLimit(1)
                     .truncationMode(.middle)
 
@@ -123,7 +125,9 @@ struct ShelfRow: View {
                 // time its own right-aligned slot, which put three claims on one
                 // edge and lost the argument to Turkish.
                 Text(metadata)
-                    .rowMeta(isPresent ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                    .rowMeta(isPresent
+                             ? AnyShapeStyle(Theme.Colour.textSecondary)
+                             : AnyShapeStyle(Theme.Colour.textTertiary))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -143,7 +147,9 @@ struct ShelfRow: View {
             // emphasis, never existence: this is a real focusable button with a
             // focus ring, and someone driving the app from the keyboard must be
             // able to reach it.
-            .foregroundStyle(isHovered ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            .foregroundStyle(isHovered
+                             ? AnyShapeStyle(.primary)
+                             : AnyShapeStyle(Theme.Colour.textSecondary))
             .opacity(isPresent ? 1 : 0.3)
             .help(String(localized: "Undo this move"))
             .disabled(!isPresent)

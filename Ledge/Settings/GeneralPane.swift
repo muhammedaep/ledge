@@ -74,7 +74,7 @@ struct GeneralPane: View {
                 if state.projects.isEmpty {
                     Text("No projects yet. Add one here, or from the shelf's destination menu.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Colour.textSecondary)
                 }
                 ForEach(state.projects) { project in
                     ProjectRow(project: project) { renamed in
@@ -179,7 +179,7 @@ private struct ProjectRow: View {
 
             Text(project.folder.path)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Colour.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.head)
 

@@ -17,7 +17,16 @@ struct PermissionView: View {
     @Environment(AppState.self) private var state
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        // Centred, with an icon, and the action as a filled accent pill —
+        // the design's treatment. This screen replaces the whole list, so it
+        // is the panel's only content when it shows; left-aligned text with a
+        // plain blue text link read as a paragraph with a footnote.
+        VStack(spacing: 9) {
+            Image(systemName: "lock.slash")
+                .font(.system(size: 24, weight: .light))
+                .foregroundStyle(Theme.Colour.textTertiary)
+                .padding(.bottom, 3)
+
             // The headline names the folder, the list below spells it as a path,
             // and the two can disagree — `İndirilenler` here, `/Users/…/Downloads`
             // a few lines down. That is deliberate, not an oversight to tidy away.
@@ -41,14 +50,16 @@ struct PermissionView: View {
             // whichever line you happened to open.
             Text("Ledge can't see your \(folderName) folder")
                 .titleText()
+                .multilineTextAlignment(.center)
 
             Text("Grant access under Privacy & Security → Files and Folders, then Ledge resumes automatically.")
                 .rowMeta()
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             // Only worth listing when the headline can't name them all.
             if blockedFolders.count > 1 {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(spacing: 2) {
                     ForEach(blockedFolders, id: \.self) { folder in
                         Text(folder.path)
                             .lineLimit(1)
@@ -56,15 +67,28 @@ struct PermissionView: View {
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Colour.textSecondary)
             }
 
-            Button("Open System Settings…", action: openPrivacySettings)
-                .buttonStyle(.plain)
-                .rowName()
-                .foregroundStyle(Theme.Colour.accent)
+            Button(action: openPrivacySettings) {
+                Text("Open System Settings…")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background {
+                        RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
+                            .fill(Theme.Colour.accent)
+                            .shadow(color: .black.opacity(0.12), radius: 1, y: 0.5)
+                    }
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 3)
         }
-        .padding(Theme.Space.panel)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 26)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 28)
         // The width comes from the shelf, which wraps this in the panel that
         // also carries Settings and Quit — this view is the *list* being
         // replaced, not the whole window.

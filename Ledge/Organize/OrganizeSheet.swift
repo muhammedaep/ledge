@@ -176,7 +176,7 @@ struct OrganizeSheet: View {
                                 Text(group.category)
                                 Spacer()
                                 Text("\(group.count)")
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Theme.Colour.textSecondary)
                                     .monospacedDigit()
                             }
                         }
@@ -212,8 +212,11 @@ struct OrganizeSheet: View {
                 Button("Undo Last Batch") { undo(outcome.id) }
                     .disabled(isMoving)
             } else {
+                // `--tx3` in the design, not `--tx2`: this is reassurance
+                // standing in for a fact, and it sits a step back from the
+                // metadata lines above it.
                 Text("One undo restores the whole batch")
-                    .rowMeta()
+                    .rowMeta(AnyShapeStyle(Theme.Colour.textTertiary))
             }
             outcomeSummary
             Spacer()
@@ -265,7 +268,7 @@ struct OrganizeSheet: View {
 
     private func message(_ text: LocalizedStringKey) -> some View {
         Text(text)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.Colour.textSecondary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 40)
     }

@@ -199,12 +199,12 @@
         }
       }
     },
-    "By extension": {
+    "By ext.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "By extension"
+            "value": "By ext."
           }
         },
         "tr": {
@@ -465,12 +465,18 @@
         }
       }
     },
-    "EXTENSIONS": {
+    "Drag to resize the shelf": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag to resize the shelf"
+          }
+        },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "UZANTILAR"
+            "value": "Rafı yeniden boyutlandırmak için sürükle"
           }
         }
       }
@@ -1573,6 +1579,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "＋ Kural Ekle"
+          }
+        }
+      }
+    },
+    "＋ Name patterns": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "＋ Name patterns"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "＋ Ad deseni"
           }
         }
       }

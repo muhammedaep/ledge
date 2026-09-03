@@ -75,14 +75,17 @@ struct RulesPane: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("Rules apply top to bottom — the first rule that claims a file wins.")
-                .rowMeta()
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, Theme.Space.panel)
                 .padding(.bottom, 8)
             Text("Renaming a rule doesn't move files that were already filed under its old name.")
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .font(.caption)
-        .foregroundStyle(.secondary)
+        // On the stack, not on the first line: the padding used to sit on line
+        // one alone, so the second sentence started 12pt further left than the
+        // first. Two reviews and a whole-branch review read past it.
+        .padding(.horizontal, Theme.Space.panel)
+        .font(.system(size: 11))
+        .foregroundStyle(Theme.Colour.textSecondary)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
     }
@@ -123,7 +126,7 @@ struct RulesPane: View {
             HStack {
                 Text("Everything else")
                     .font(.body.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Colour.textSecondary)
                 TextField("Other", text: $draft.fallbackName)
                     .textFieldStyle(.roundedBorder)
             }
@@ -164,7 +167,7 @@ struct RulesPane: View {
             } else if isDirty {
                 Text("Unsaved changes")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Colour.textSecondary)
             }
 
             Button("Discard Changes") {
@@ -457,160 +460,176 @@ private struct CategoryRow: View {
         if typedPatterns != stored { typedPatterns = stored }
     }
 
-    /// Whether either field has the keyboard. A card being typed into must
-    /// never collapse under the cursor.
-    private var isEditing: Bool { isEditingExtensions || isEditingPatterns }
-
-    /// A clean rule with nothing to say collapses to its name and its
-    /// extensions. It expands the moment it has patterns to show or a
-    /// diagnostic to raise — the two cases where the fields are the point.
-    private var isExpanded: Bool {
-        isEditing || !category.namePatterns.isEmpty || !messages.isEmpty
+    /// Whether the patterns editor is on screen.
+    ///
+    /// Only the patterns block is conditional now; the row above it is always
+    /// drawn, so nothing the user needs can be hidden behind this.
+    private var showsPatterns: Bool {
+        isEditingPatterns || !category.namePatterns.isEmpty
     }
 
-    /// What a collapsed card shows in place of its fields.
-    private var collapsedSummary: String {
-        category.extensions.isEmpty
-            ? String(localized: "no extensions")
-            : category.extensions.joined(separator: " ")
-    }
-
-    /// The extensions field, the patterns editor, the subfolder picker and
-    /// every diagnostic this row has to raise. Hidden while the card is
-    /// collapsed — see `isExpanded`.
-    @ViewBuilder
-    private var fieldsAndDiagnostics: some View {
-        Text("EXTENSIONS")
-            .fieldLabel()
-        // `String()` rather than the `""` literal: an empty string literal
-        // still resolves to the `LocalizedStringKey` overload, and the
-        // compiler extracts it as a catalog key of its own — an empty title
-        // with nothing to translate, failing `make strings` for a key that
-        // says nothing. Passing an already-typed `String` selects the
-        // `StringProtocol` overload instead, which isn't extracted at all.
-        // The field needs no placeholder: the caption above already names it.
-        TextField(String(), text: $typedExtensions)
-            .textFieldStyle(.plain)
-            .mono()
-            .padding(.horizontal, 6)
-            .frame(height: Theme.Size.field)
-            .background {
-                RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
-                    .fill(Theme.Colour.fieldFill)
-            }
+    /// A bordered field, drawn the way the boards draw both of the card's.
+    private func fieldBackground() -> some View {
+        RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+            .fill(Theme.Colour.fieldFill)
             .overlay {
                 RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
                     .stroke(Theme.Colour.fieldBorder, lineWidth: 1)
             }
-            .focused($isEditingExtensions)
-            .onSubmit(tidy)
+    }
 
-        MessageList(messages: rewriteNotes)
+    /// Patterns and diagnostics only.
+    ///
+    /// The name, the extensions and the subdivision control moved up into the
+    /// card's first row, where the boards put them. That is not only a layout
+    /// change: while the subdivision picker lived in here, a clean rule with no
+    /// patterns and no diagnostics rendered none of this, and its picker could
+    /// not be reached by pointer or keyboard at all. Nine of the ten default
+    /// rules ship in exactly that state. Keeping the row always visible ends
+    /// that whole class of bug rather than patching the way in.
+    private var patternsAndDiagnostics: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            MessageList(messages: rewriteNotes)
 
-        // A TextEditor rather than TextField(axis: .vertical): on macOS
-        // Return in a vertical TextField submits rather than inserting a
-        // newline, and a newline is this field's separator (see
-        // `Category.parseNamePatterns`). A control the user cannot type
-        // the separator into is not a control.
-        VStack(alignment: .leading, spacing: 2) {
-            Text("NAME PATTERNS · ONE PER LINE")
-                .fieldLabel()
-            TextEditor(text: $typedPatterns)
-                .mono()
-                .scrollContentBackground(.hidden)
-                .frame(height: 46)
-                .padding(4)
-                .background {
-                    RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
-                        .fill(Theme.Colour.fieldFill)
+            if showsPatterns {
+                // A TextEditor rather than TextField(axis: .vertical): on macOS
+                // Return in a vertical TextField submits rather than inserting a
+                // newline, and a newline is this field's separator (see
+                // `Category.parseNamePatterns`). A control the user cannot type
+                // the separator into is not a control.
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("NAME PATTERNS · ONE PER LINE")
+                        .fieldLabel()
+                    TextEditor(text: $typedPatterns)
+                        .mono()
+                        .scrollContentBackground(.hidden)
+                        .frame(height: 46)
+                        .padding(4)
+                        .background { fieldBackground() }
+                        .focused($isEditingPatterns)
                 }
-                .overlay {
-                    RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
-                        .stroke(Theme.Colour.fieldBorder, lineWidth: 1)
-                }
-                .focused($isEditingPatterns)
-        }
-
-        HStack(spacing: 6) {
-            Text("Subfolders")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Picker("Subfolders", selection: $category.subdivision) {
-                Text("None").tag(Subdivision.none)
-                Text("By extension").tag(Subdivision.byExtension)
-                Text("By month").tag(Subdivision.byMonth)
+            } else {
+                // The boards show no patterns block on a rule that has none.
+                // This is how a user gets one, and it is a Button so that Tab
+                // reaches it — the same lesson as the card row above.
+                Button("＋ Name patterns") { isEditingPatterns = true }
+                    .buttonStyle(.plain)
+                    .actionLink()
+                    .foregroundStyle(Theme.Colour.accent)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-        }
 
-        MessageList(messages: messages)
+            MessageList(messages: messages)
+        }
+    }
+
+    /// The subdivision control, hand-built to the source's `.seg` rather than
+    /// `.pickerStyle(.segmented)`.
+    ///
+    /// The native control draws the system's chrome — its own height, its own
+    /// selected-fill and its own divider — none of which the design asks for,
+    /// and none of which a caller can change. `.seg` is a 1pt-padded track at
+    /// 14% grey with a 5pt selected pill that carries a fill and a shadow.
+    ///
+    /// Buttons, not tap gestures: this is the control C1 was about, and a
+    /// segment that the keyboard cannot reach is the same bug wearing a
+    /// different hat.
+    private var subdivisionControl: some View {
+        HStack(spacing: 0) {
+            segment("None", .none)
+            segment("By ext.", .byExtension)
+            segment("By month", .byMonth)
+        }
+        .padding(1)
+        .background {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Theme.Colour.segmentTrack)
+        }
+    }
+
+    private func segment(_ title: LocalizedStringKey, _ value: Subdivision) -> some View {
+        let isOn = category.subdivision == value
+        return Button { category.subdivision = value } label: {
+            Text(title)
+                .font(.system(size: 11, weight: isOn ? .medium : .regular))
+                .foregroundStyle(isOn
+                                 ? AnyShapeStyle(.primary)
+                                 : AnyShapeStyle(Theme.Colour.textSecondary))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background {
+                    if isOn {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(Theme.Colour.fieldFill)
+                            .shadow(color: .black.opacity(0.18), radius: 1, y: 0.5)
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The card's border carries the worst diagnostic on it, as in the source:
+    /// a rule that can never match is outlined red, one with a warning amber.
+    private var cardBorder: Color {
+        if messages.contains(where: \.isBlocking) { return Theme.Colour.red.opacity(0.45) }
+        if !messages.isEmpty { return Theme.Colour.amber.opacity(0.45) }
+        return Theme.Colour.chipBorder
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: Theme.Space.card) {
-            VStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
+            // The boards' first row: ordinal, name, extensions, subdivision,
+            // and the reordering controls — all of it always on screen.
+            HStack(spacing: Theme.Space.card) {
                 Text("\(position.index + 1)")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Theme.Colour.textTertiary)
                     .monospacedDigit()
+                    .frame(width: 20)
 
-                Button { move(-1) } label: {
-                    Image(systemName: "chevron.up").font(.system(size: 9, weight: .bold))
-                }
-                .disabled(!position.canMoveUp)
-                .help("Move up — earlier rules win ties")
-
-                Button { move(1) } label: {
-                    Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
-                }
-                .disabled(!position.canMoveDown)
-                .help("Move down — later rules only see what's left")
-            }
-            .buttonStyle(ArrowButtonStyle())
-            .frame(width: 20)
-            .padding(.top, 2)
-
-            VStack(alignment: .leading, spacing: 6) {
                 TextField("Name", text: $category.name)
                     .textFieldStyle(.plain)
-                    .rowName()
-                    .fontWeight(.medium)
+                    .font(.system(size: 12, weight: .medium))
+                    .padding(.horizontal, 6)
+                    .frame(width: 116, height: Theme.Size.field)
+                    .background { fieldBackground() }
 
-                if isExpanded {
-                    fieldsAndDiagnostics
-                } else {
-                    // A `Button`, not a `Text` with `.onTapGesture`: a tap
-                    // gesture is invisible to Tab, and this row is otherwise
-                    // unreachable by anything but the name field. Nine of the
-                    // ten default rules collapse to exactly this state, and
-                    // this is the only route from there to the patterns
-                    // field, the diagnostics and the Subfolders picker.
-                    Button {
-                        isEditingExtensions = true
-                    } label: {
-                        Text(collapsedSummary)
-                            .mono()
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
+                // `no extensions` is the boards' placeholder, and it carries
+                // real information: a rule with none matches on patterns only.
+                TextField("no extensions", text: $typedExtensions)
+                    .textFieldStyle(.plain)
+                    .mono()
+                    .padding(.horizontal, 6)
+                    .frame(height: Theme.Size.field)
+                    .background { fieldBackground() }
+                    .focused($isEditingExtensions)
+                    .onSubmit(tidy)
+
+                subdivisionControl
+
+                VStack(spacing: 2) {
+                    Button { move(-1) } label: {
+                        Image(systemName: "chevron.up").font(.system(size: 9, weight: .bold))
                     }
-                    .buttonStyle(.plain)
+                    .disabled(!position.canMoveUp)
+                    .help("Move up — earlier rules win ties")
+
+                    Button { move(1) } label: {
+                        Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+                    }
+                    .disabled(!position.canMoveDown)
+                    .help("Move down — later rules only see what's left")
+
+                    Button(role: .destructive, action: remove) {
+                        Image(systemName: "minus").font(.system(size: 9, weight: .bold))
+                    }
+                    .help("Remove this rule")
                 }
+                .buttonStyle(ArrowButtonStyle())
+                .frame(width: 20)
             }
 
-            Spacer(minLength: 4)
-
-            Button(role: .destructive, action: remove) {
-                Image(systemName: "minus.circle")
-                    .font(.system(size: 11))
-                    .frame(width: 20, height: 20)
-            }
-            .buttonStyle(HoverGlyphButtonStyle(cornerRadius: 5))
-            .foregroundStyle(.secondary)
-            .help("Remove this rule")
+            patternsAndDiagnostics
         }
         .padding(.vertical, 9)
         .padding(.horizontal, Theme.Space.card)
@@ -620,7 +639,7 @@ private struct CategoryRow: View {
         }
         .overlay {
             RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                .stroke(Theme.Colour.chipBorder, lineWidth: 1)
+                .stroke(cardBorder, lineWidth: 1)
         }
         // The draft is kept current on every keystroke, so clicking Save
         // without leaving the field still saves what is on screen.
@@ -682,6 +701,6 @@ private struct ArrowButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(Color(white: 0.5, opacity: configuration.isPressed ? 0.22 : 0.12))
             }
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.Colour.textSecondary)
     }
 }

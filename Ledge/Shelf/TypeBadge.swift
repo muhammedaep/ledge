@@ -57,9 +57,16 @@ struct TypeBadge: View {
                 .fill(palette.page)
             PageShape()
                 .stroke(palette.border, lineWidth: 1)
+            // The dog-ear. The design draws it as a second filled triangle in
+            // the border colour — without it the turned-down corner is an
+            // empty notch and the badge stops reading as a page.
+            FlapShape()
+                .fill(palette.border)
             if !label.isEmpty {
                 Text(label)
-                    .font(.system(size: 7, weight: .bold))
+                    // 6.4 for four characters, as the design does for HEIC:
+                    // at 7 they touch the page's edges.
+                    .font(.system(size: label.count > 3 ? 6.4 : 7, weight: .bold))
                     .foregroundStyle(palette.label)
                     .offset(y: 9)
             }
@@ -83,6 +90,20 @@ private struct PageShape: Shape {
         path.addLine(to: CGPoint(x: 25 * s, y: 9 * s))
         path.addLine(to: CGPoint(x: 25 * s, y: 29 * s))
         path.addLine(to: CGPoint(x: 7 * s, y: 29 * s))
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// The turned-down corner, filled rather than stroked. Same 32pt grid as
+/// `PageShape`, and the same three points the design's second path uses.
+private struct FlapShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let s = rect.width / 32
+        var path = Path()
+        path.move(to: CGPoint(x: 19 * s, y: 3 * s))
+        path.addLine(to: CGPoint(x: 25 * s, y: 9 * s))
+        path.addLine(to: CGPoint(x: 19 * s, y: 9 * s))
         path.closeSubpath()
         return path
     }

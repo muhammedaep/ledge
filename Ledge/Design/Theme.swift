@@ -28,6 +28,11 @@ enum Theme {
     enum Size {
         static let field: CGFloat = 22
         static let button: CGFloat = 26
+        /// The destination chip. `.pop { height: 28px }` in the design source.
+        ///
+        /// Taken from the file, not from reading a screenshot: guessing from
+        /// the rendering put this at 36 and then 46, both wrong, and the second
+        /// made the chip taller than the rows it sits above.
         static let popup: CGFloat = 28
         static let row: CGFloat = 46
         static let footer: CGFloat = 38
@@ -36,6 +41,9 @@ enum Theme {
 
     enum Radius {
         static let field: CGFloat = 5
+        /// Every filled or bordered pill in the design: the chip, the segment
+        /// track, the diagnostics, the sheet's buttons.
+        static let pill: CGFloat = 6
         static let row: CGFloat = 7
         static let card: CGFloat = 8
         static let window: CGFloat = 10
@@ -44,6 +52,29 @@ enum Theme {
 
     enum Colour {
         /// The four the system has no equivalent for.
+        /// `--tx2` and `--tx3`, taken from the design source rather than left
+        /// to `.secondary` and `.tertiary`.
+        ///
+        /// The system's semantics are close but thinner: `.secondary` renders
+        /// the metadata line at about 50% where the design asks for 62%, and
+        /// `.tertiary` dims a stale row to roughly 25% against the design's
+        /// 38%. Read side by side with the boards, ours was the paler of the
+        /// two and the second line under each filename was the first thing to
+        /// suffer for it.
+        static let textSecondary = dynamic(light: srgb(60, 60, 67, 0.62),
+                                           dark: srgb(235, 235, 245, 0.58))
+        static let textTertiary = dynamic(light: srgb(60, 60, 67, 0.38),
+                                          dark: srgb(235, 235, 245, 0.32))
+
+        /// `.seg` — the subdivision control's track, rgba(127,127,127,.14).
+        /// Grey rather than a themed white or black: it has to sit on the card
+        /// in both appearances without inverting.
+        static let segmentTrack = Color(nsColor: NSColor(white: 0.5, alpha: 0.14))
+
+        /// `--chipbg` / `--chipbd`. One surface for the destination chip and
+        /// the rows both — the design shares them deliberately, and inventing a
+        /// second pair to "separate" them was a guess that the source does not
+        /// support.
         static let chipFill = dynamic(light: white(1, 0.72), dark: white(1, 0.075))
         static let chipBorder = dynamic(light: white(0, 0.07), dark: white(1, 0.07))
         static let fieldFill = dynamic(light: white(1, 1), dark: white(1, 0.06))
@@ -58,15 +89,26 @@ enum Theme {
         static let redFill = dynamic(light: srgb(0xff3b30, 0.09), dark: srgb(0xff6961, 0.12))
 
         /// The badge families — see the type badge. Page, border, label.
-        static let badgeDocPage = dynamic(light: srgb(0xfdeceb), dark: srgb(0xff6961, 0.14))
-        static let badgeDocBorder = dynamic(light: srgb(0xeec0bc), dark: srgb(0xff6961, 0.28))
+        ///
+        /// The dark values are the design's own rgba triples, not the label
+        /// hue re-used at a guessed alpha. Three things were wrong here: every
+        /// border sat at 0.28 where the design asks 0.45–0.5, the fills were a
+        /// step light, and the document family was built from the semantic
+        /// `red` (255,105,97) rather than its own coral (240,150,140) — a
+        /// different hue, not a different opacity.
+        static let badgeDocPage = dynamic(light: srgb(0xfdeceb), dark: srgb(240, 150, 140, 0.16))
+        static let badgeDocBorder = dynamic(light: srgb(0xeec0bc), dark: srgb(240, 150, 140, 0.45))
         static let badgeDocLabel = dynamic(light: srgb(0xc4544c), dark: srgb(0xef9a92))
-        static let badgeImagePage = dynamic(light: srgb(0xeaf3fd), dark: srgb(0x82b4ec, 0.14))
-        static let badgeImageBorder = dynamic(light: srgb(0xbcd6f2), dark: srgb(0x82b4ec, 0.28))
+        static let badgeImagePage = dynamic(light: srgb(0xeaf3fd), dark: srgb(120, 170, 235, 0.18))
+        static let badgeImageBorder = dynamic(light: srgb(0xbcd6f2), dark: srgb(120, 170, 235, 0.50))
         static let badgeImageLabel = dynamic(light: srgb(0x3b74b5), dark: srgb(0x82b4ec))
-        static let badgeMoviePage = dynamic(light: srgb(0xf0ebfb), dark: srgb(0xc3a3ef, 0.14))
-        static let badgeMovieBorder = dynamic(light: srgb(0xd0c2ee), dark: srgb(0xc3a3ef, 0.28))
+        static let badgeMoviePage = dynamic(light: srgb(0xf0ebfb), dark: srgb(190, 150, 240, 0.16))
+        static let badgeMovieBorder = dynamic(light: srgb(0xd0c2ee), dark: srgb(190, 150, 240, 0.45))
         static let badgeMovieLabel = dynamic(light: srgb(0x7a5bc0), dark: srgb(0xc3a3ef))
+
+        /// `--sep`. The hairline under the shelf's footer and the Settings
+        /// toolbar. Both drew a system `Divider()`, which is not this colour.
+        static let separator = dynamic(light: white(0, 0.09), dark: white(1, 0.10))
 
         /// One neutral in both themes, so a hover never has to know the theme.
         static let hover = Color(white: 0.5, opacity: 0.16)
@@ -95,6 +137,11 @@ enum Theme {
 
         private static func white(_ value: CGFloat, _ alpha: CGFloat) -> NSColor {
             NSColor(white: value, alpha: alpha)
+        }
+
+        private static func srgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat,
+                                 _ alpha: CGFloat) -> NSColor {
+            NSColor(srgbRed: r / 255, green: g / 255, blue: b / 255, alpha: alpha)
         }
     }
 }
@@ -138,14 +185,14 @@ extension View {
     func sectionLabel() -> some View {
         font(.system(size: 11, weight: .semibold))
             .tracking(0.66)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(Theme.Colour.textTertiary)
     }
 
     /// 10 semibold, +0.05em, tertiary. The field labels inside a rule card.
     func fieldLabel() -> some View {
         font(.system(size: 10, weight: .semibold))
             .tracking(0.5)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(Theme.Colour.textTertiary)
     }
 
     /// 13 regular, primary. Filenames and controls.
@@ -163,8 +210,13 @@ extension View {
     /// beats one applied to it from further out in the same chain, whichever
     /// comes later in the source. The same trap is waiting in `sectionLabel()`
     /// and `fieldLabel()`, which set `.tertiary` the same way.
-    func rowMeta(_ style: AnyShapeStyle = AnyShapeStyle(.secondary)) -> some View {
-        font(.system(size: 11)).foregroundStyle(style)
+    func rowMeta(
+        _ style: AnyShapeStyle = AnyShapeStyle(Theme.Colour.textSecondary)
+    ) -> some View {
+        // 11/14 in the source. The explicit line height matters: left to
+        // SwiftUI's default the metadata sat a point lower and the two lines
+        // stopped reading as one object.
+        font(.system(size: 11)).lineSpacing(0).foregroundStyle(style)
     }
 
     /// 11 SF Mono, primary. Extensions, name patterns, globs.
@@ -187,6 +239,13 @@ extension View {
     /// 13 semibold, primary. Window titles and the empty-state headline.
     func titleText() -> some View {
         font(.system(size: 13, weight: .semibold))
+    }
+
+    /// The destination's name in the shelf's chip. The design gives it the
+    /// panel's own 13pt — same as a row name — so this exists only to say that
+    /// out loud after 15pt was tried and was not what the source says.
+    func destinationName() -> some View {
+        font(.system(size: 13))
     }
 
     /// 12 regular, primary. Field text and the Organize sheet's list rows.

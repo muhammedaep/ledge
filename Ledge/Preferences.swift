@@ -19,6 +19,7 @@ final class Preferences {
         static let automaticFiling = "automaticFilingEnabled"
         static let activeProjectID = "activeProjectID"
         static let appearance = "appearance"
+        static let shelfHeight = "shelfHeight"
     }
 
     var watchedFolders: [URL] {
@@ -46,6 +47,16 @@ final class Preferences {
 
     var appearance: AppearanceSetting {
         didSet { UserDefaults.standard.set(appearance.rawValue, forKey: Key.appearance) }
+    }
+
+    /// How tall the shelf's list is, in points, or nil until the user has
+    /// dragged it. Nil rather than a number so the default can be "three rows"
+    /// — a row's height comes from its own content and type size, and a
+    /// hard-coded default would drift the moment either changed.
+    var shelfHeight: Double? {
+        didSet {
+            UserDefaults.standard.set(shelfHeight ?? 0, forKey: Key.shelfHeight)
+        }
     }
 
     var launchAtLogin: Bool {
@@ -83,6 +94,11 @@ final class Preferences {
         // which is the behaviour every existing install already has.
         appearance = defaults.string(forKey: Key.appearance)
             .flatMap(AppearanceSetting.init(rawValue:)) ?? .system
+        // 0 is the "never dragged" marker: `double(forKey:)` cannot tell an
+        // absent key from a stored zero, and a zero-height shelf is not a
+        // state worth being able to express anyway.
+        let stored = defaults.double(forKey: Key.shelfHeight)
+        shelfHeight = stored > 0 ? stored : nil
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 }

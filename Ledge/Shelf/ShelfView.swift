@@ -16,8 +16,18 @@ struct ShelfView: View {
     /// banner's action — `SettingsLink` is a view and cannot be called from one.
     @Environment(\.openSettings) private var openSettings
     @State private var showingOrganize = false
-    /// Height the rows want, measured; the shelf clamps it to 340.
+    /// Height the rows want, measured; the shelf clamps it to the user's.
     @State private var rowsHeight: CGFloat = 0
+    /// Height at the moment a resize drag began, so the drag is relative.
+    @State private var heightAtDragStart: Double?
+    /// The height while a drag is in flight, before it is committed.
+    ///
+    /// Local on purpose. Writing each drag increment straight to `Preferences`
+    /// put a `UserDefaults` write and an `@Observable` invalidation inside
+    /// every mouse-move: the whole shelf rebuilt, the rows re-measured, and the
+    /// height visibly juddered under the cursor. The drag now moves this, and
+    /// only the release is persisted.
+    @State private var liveHeight: Double?
 
     /// Liveness per record id, refreshed whenever the shelf appears.
     ///
@@ -170,6 +180,67 @@ struct ShelfView: View {
         !state.hasUsableFolder && !state.unreadableFolders.isEmpty
     }
 
+    /// Three rows, until the user says otherwise.
+    ///
+    /// Derived from what the rows actually measured rather than a constant:
+    /// a row's height follows its type size and padding, so a hard-coded
+    /// default would be wrong the first time either changed.
+    private var defaultListHeight: Double {
+        let count = max(state.recentRecords.count, 1)
+        return Double(rowsHeight) / Double(count) * 3
+    }
+
+    /// How tall the list is allowed to be right now.
+    private var listHeight: Double {
+        let wanted = liveHeight ?? state.preferences.shelfHeight ?? defaultListHeight
+        return min(max(wanted, Self.minListHeight), Self.maxListHeight)
+    }
+
+    private static let minListHeight: Double = 52
+    private static let maxListHeight: Double = 520
+
+    /// The drag handle under the list.
+    ///
+    /// A menu bar panel cannot be resized from its window edges — the panel
+    /// `MenuBarExtra(style: .window)` puts the shelf in has no resize control
+    /// and SwiftUI sizes it from the content — so the shelf carries its own.
+    private var resizeGrip: some View {
+        Capsule()
+            .fill(Theme.Colour.chipBorder)
+            .frame(width: 28, height: 3)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
+            .gesture(
+                // `.global`, not the default local space. The grip is part of
+                // what it resizes: as the list grows the handle moves down with
+                // it, so a translation measured locally is taken from an origin
+                // that has itself shifted since the drag began. That feeds back
+                // and the height oscillates under the cursor. Screen
+                // coordinates do not move, so the drag stays stable.
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { value in
+                        let start = heightAtDragStart ?? listHeight
+                        heightAtDragStart = start
+                        liveHeight = min(
+                            max(start + value.translation.height, Self.minListHeight),
+                            Self.maxListHeight)
+                    }
+                    .onEnded { _ in
+                        state.preferences.shelfHeight = listHeight
+                        heightAtDragStart = nil
+                        liveHeight = nil
+                    }
+            )
+            .help("Drag to resize the shelf")
+            // push/pop, not set/set: `set()` on both edges of the hover leaves
+            // AppKit's cursor stack unbalanced and the cursor flickers between
+            // the two shapes while the pointer sits still.
+            .onHover { inside in
+                if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
+            }
+    }
+
     private var shelf: some View {
         VStack(alignment: .leading, spacing: 0) {
             destinationHeader
@@ -181,17 +252,26 @@ struct ShelfView: View {
                 .padding(.bottom, 5)
 
             if state.recentRecords.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
+                // Centred, with the menu bar's own icon above it, and the
+                // headline at plain weight — all three from the design, which
+                // this had left-aligned, iconless and semibold.
+                VStack(spacing: 2) {
+                    Image(systemName: "tray.and.arrow.down")
+                        .font(.system(size: 22, weight: .light))
+                        .opacity(0.3)
+                        .padding(.bottom, 6)
                     Text("Nothing filed yet")
-                        .titleText()
+                        .font(.system(size: 13))
                     // The only line in the app that explains the product.
                     Text("New downloads appear here — drag any row to use the file.")
                         .rowMeta()
+                        .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Theme.Space.panel)
-                .padding(.vertical, 22)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 26)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 30)
             } else {
                 ScrollView {
                     VStack(spacing: Theme.Space.rowGap) {
@@ -237,8 +317,14 @@ struct ShelfView: View {
                 // it. `VStack`, not `LazyVStack`: a lazy stack inside a
                 // zero-height scroll view renders nothing and would report zero
                 // forever, which is the deadlock this measurement must avoid.
-                .frame(height: min(rowsHeight, 340))
+                // Whole points, and no implicit animation: this frame drives an
+                // NSPanel resize on every drag event, and a fractional or
+                // animated height makes the window chase the cursor.
+                .frame(height: (min(rowsHeight, listHeight)).rounded())
+                .animation(nil, value: listHeight)
                 .onPreferenceChange(RowsHeight.self) { rowsHeight = $0 }
+
+                resizeGrip
             }
         }
     }
@@ -290,7 +376,7 @@ struct ShelfView: View {
                     .frame(width: 28, height: Theme.Size.button)
             }
             .buttonStyle(HoverGlyphButtonStyle())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.Colour.textSecondary)
             .help(String(localized: "Settings"))
 
             Button {
@@ -300,7 +386,7 @@ struct ShelfView: View {
                     .frame(width: 28, height: Theme.Size.button)
             }
             .buttonStyle(HoverGlyphButtonStyle())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.Colour.textSecondary)
             .help(String(localized: "Quit Ledge"))
         }
         .padding(.leading, Theme.Space.panel)
@@ -500,35 +586,78 @@ struct ShelfView: View {
                 Button("Choose Project…", action: chooseProject)
             } label: {
                 HStack(spacing: 7) {
+                    // The boards put a filled accent folder at the head of the
+                    // chip. It is what makes the row read as a destination
+                    // rather than a title, so it is not decoration.
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Colour.accent)
+
                     Text(state.activeProject?.name ?? defaultDestinationName)
-                        .rowName()
+                        .destinationName()
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 16, height: 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(Theme.Colour.accent)
-                        )
                 }
-                .padding(.leading, 9)
-                .padding(.trailing, 7)
-                .frame(height: Theme.Size.popup)
-                .background {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Theme.Colour.chipFill)
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(Theme.Colour.chipBorder, lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.08), radius: 0.75, y: 0.5)
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
+            // The chip's chrome is drawn around the `Menu`, not inside its
+            // label, and that is load-bearing rather than tidiness.
+            //
+            // A macOS `Menu` renders its own label: a background, an overlay, a
+            // shadow and a trailing decorated image handed to it inside the
+            // label are all discarded, and only the plain text and icon
+            // survive. Shipped that way, the destination showed as loose text
+            // with an icon — no container and no control — in both themes,
+            // which is what made it look nothing like the boards.
+            // 9 left, and 30 right = the design's 7pt gap, its 16pt control
+            // and its 7pt padding, since that control is an overlay here.
+            .padding(.leading, 9)
+            .padding(.trailing, 30)
+            // A `Menu` is only as wide as its own label, and the chrome wrapped
+            // around it inherited that — so the chip stopped short while every
+            // row beneath it ran the full width, which is what made the header
+            // look like a different design from the list.
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: Theme.Size.popup)
+            .background {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Theme.Colour.chipFill)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(Theme.Colour.chipBorder, lineWidth: 1)
+            }
+            // Up-and-down, not a lone chevron: the control picks from a list
+            // rather than revealing something below it. Non-interactive — the
+            // whole chip is already the menu's hit area, and letting this take
+            // clicks would put a dead square on top of it.
+            .overlay(alignment: .trailing) {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 16, height: 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(Theme.Colour.accent)
+                    )
+                    .padding(.trailing, 7)
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: .black.opacity(0.08), radius: 0.75, y: 0.5)
+            // Opening this menu is a deliberate interaction, so it is the
+            // moment Ledge is allowed to come forward. Without it the click
+            // lands, the menu opens, and the app drops behind whatever was in
+            // front — so the next click goes to that app instead and the user
+            // has to click twice for everything.
+            //
+            // Deliberately here and not in `configure`: activating when the
+            // panel merely *opens* would pull focus off the app the user is
+            // dragging into, which is the whole point of the shelf.
+            .simultaneousGesture(TapGesture().onEnded {
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            })
 
             if let project = state.activeProject {
                 Text("All new downloads go here until you end the project.")
