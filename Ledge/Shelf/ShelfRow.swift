@@ -167,7 +167,11 @@ struct ShelfRow: View {
             RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
                 .stroke(isPresent ? Theme.Colour.chipBorder : Color.clear, lineWidth: 1)
         }
-        .shadow(color: .black.opacity(isPresent ? 0.06 : 0), radius: 1, y: 1)
+        // The token, not the numbers: these were right, and staying right
+        // means changing with the rest of the scale rather than beside it.
+        // A stale row keeps the geometry and drops the colour.
+        .shadow(color: .black.opacity(isPresent ? Theme.Shadow.row.opacity : 0),
+                radius: Theme.Shadow.row.radius, y: Theme.Shadow.row.y)
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .animation(.easeOut(duration: 0.12), value: isHovered)

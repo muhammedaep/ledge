@@ -575,76 +575,33 @@ struct ShelfView: View {
     /// which folder the next download will land in.
     private var destinationHeader: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(state.activeProject == nil
-                 ? String(localized: "FILING INTO")
-                 : String(localized: "PROJECT MODE"))
-                .sectionLabel()
+            // Label and End on one row, pushed apart — the design's layout.
+            // They were stacked at opposite ends of the header with the chip
+            // and a sentence between them, so the control that leaves project
+            // mode sat as far as it could get from the label announcing it.
+            HStack(alignment: .firstTextBaseline) {
+                Text(state.activeProject == nil
+                     ? String(localized: "FILING INTO")
+                     : String(localized: "PROJECT MODE"))
+                    .sectionLabel()
 
-            // A `Button` and an `NSMenu`, not a SwiftUI `Menu`.
-            //
-            // A macOS `Menu` owns how its label is drawn and how far it takes
-            // clicks, and it disagreed with this design four separate ways: it
-            // discarded the background, border, shadow and trailing control
-            // handed to it inside the label; it sized itself to its text so
-            // the chrome wrapped around it stopped short of the panel; it took
-            // clicks only where the text actually was; and it ignored the
-            // height, keeping the system control's own. Each was fixable by
-            // moving one modifier inside or outside, and each fix broke a
-            // different one of the other three.
-            //
-            // Owning both halves ends the class of bug rather than the
-            // instance. The button draws the chip exactly as the design does
-            // and takes clicks across all of it; the menu is built in AppKit,
-            // where a checkmark on the active destination is one property.
-            Button {
+                if let project = state.activeProject {
+                    Spacer(minLength: 8)
+                    Button("End") { state.setActiveProject(nil) }
+                        .buttonStyle(.plain)
+                        .actionLink()
+                        .foregroundStyle(Theme.Colour.accent)
+                        .accessibilityLabel(Text("End project \(project.name)"))
+                }
+            }
+
+            ChipButton(title: state.activeProject?.name ?? defaultDestinationName) {
                 NSApplication.shared.activate(ignoringOtherApps: true)
                 showDestinationMenu()
-            } label: {
-                HStack(spacing: 7) {
-                    // The boards put a filled accent folder at the head of the
-                    // chip. It is what makes the row read as a destination
-                    // rather than a title, so it is not decoration.
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.Colour.accent)
-
-                    Text(state.activeProject?.name ?? defaultDestinationName)
-                        .destinationName()
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    Spacer(minLength: 0)
-
-                    // Up-and-down, not a lone chevron: the control picks from a
-                    // list rather than revealing something below it.
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 16, height: 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(Theme.Colour.accent)
-                        )
-                }
-                .padding(.leading, 9)
-                .padding(.trailing, 7)
-                .frame(maxWidth: .infinity)
-                .frame(height: Theme.Size.popup)
-                .background {
-                    RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
-                        .fill(Theme.Colour.chipFill)
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
-                        .stroke(Theme.Colour.chipBorder, lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.08), radius: 0.75, y: 0.5)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
             .accessibilityLabel(Text("Filing into"))
-            // Where to hang the menu from. Read here rather than guessed,
-            // because the chip's own frame is the only thing that knows it.
+            // Where to hang the menu from. Read rather than guessed, because
+            // the chip's own frame is the only thing that knows it.
             .background(
                 GeometryReader { proxy in
                     Color.clear.preference(key: ChipFrame.self,
@@ -653,21 +610,27 @@ struct ShelfView: View {
             )
             .onPreferenceChange(ChipFrame.self) { chipFrame = $0 }
 
-            if let project = state.activeProject {
+            if state.activeProject != nil {
                 Text("All new downloads go here until you end the project.")
                     .rowMeta()
                     .fixedSize(horizontal: false, vertical: true)
-                Button("End") { state.setActiveProject(nil) }
-                    .buttonStyle(.plain)
-                    .actionLink()
-                    .foregroundStyle(Theme.Colour.accent)
-                    .accessibilityLabel(Text("End project \(project.name)"))
             }
         }
         .padding(.horizontal, Theme.Space.panel)
-        .padding(.top, Theme.Space.panel)
-        .padding(.bottom, state.activeProject == nil ? 0 : 10)
+        // 10 above and 12 below in project mode, which is the design's; these
+        // were the other way round.
+        .padding(.top, state.activeProject == nil ? Theme.Space.panel : 10)
+        .padding(.bottom, state.activeProject == nil ? 0 : Theme.Space.panel)
         .background(state.activeProject == nil ? Color.clear : Theme.Colour.accent.opacity(0.08))
+        // The tinted header ends in a rule of its own, so project mode reads
+        // as a band across the top rather than a colour that fades out.
+        .overlay(alignment: .bottom) {
+            if state.activeProject != nil {
+                Rectangle()
+                    .fill(Theme.Colour.accent.opacity(0.15))
+                    .frame(height: 1)
+            }
+        }
     }
 
     /// What to call the no-project destination.
@@ -688,46 +651,24 @@ struct ShelfView: View {
 
     /// Builds and shows the destination menu, anchored under the chip.
     ///
-    /// AppKit rather than SwiftUI: see the note on the button that calls it.
-    /// The checkmark is `.state`, which is what a menu item has for exactly
-    /// this and what the SwiftUI version had to fake with an SF Symbol name
+    /// `.state` on the item is the checkmark — a menu item has one for exactly
+    /// this, where the SwiftUI version had to fake it with an SF Symbol name
     /// that was sometimes the empty string.
     @MainActor private func showDestinationMenu() {
-        let menu = NSMenu()
-        menuActions.handlers.removeAll()
-
-        func add(_ title: String, checked: Bool, run: @escaping () -> Void) {
-            let item = NSMenuItem(title: title,
-                                  action: #selector(MenuActions.fire(_:)),
-                                  keyEquivalent: "")
-            item.target = menuActions
-            item.tag = menuActions.handlers.count
-            item.state = checked ? .on : .off
-            menuActions.handlers[item.tag] = run
-            menu.addItem(item)
-        }
-
-        add(defaultDestinationName, checked: state.activeProject == nil) {
-            state.setActiveProject(nil)
-        }
+        var items: [(title: String, checked: Bool, run: () -> Void)] = [
+            (defaultDestinationName, state.activeProject == nil,
+             { state.setActiveProject(nil) })
+        ]
         for project in state.projects {
-            add(project.name, checked: state.activeProject?.id == project.id) {
-                state.setActiveProject(project)
-            }
+            items.append((project.name,
+                          state.activeProject?.id == project.id,
+                          { state.setActiveProject(project) }))
         }
-        menu.addItem(.separator())
-        add(String(localized: "Choose Project…"), checked: false) { chooseProject() }
+        let separator = items.count
+        items.append((String(localized: "Choose Project…"), false, { chooseProject() }))
 
-        // Under the chip's bottom-left corner. SwiftUI's global space has its
-        // origin top-left and AppKit's content view bottom-left, so the y has
-        // to be flipped rather than passed through.
-        guard let content = shelfWindow?.contentView, chipFrame != .zero else {
-            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
-            return
-        }
-        let point = NSPoint(x: chipFrame.minX,
-                            y: content.bounds.height - chipFrame.maxY)
-        menu.popUp(positioning: nil, at: point, in: content)
+        menuActions.show(items, separatorBefore: separator,
+                         under: chipFrame, in: shelfWindow)
     }
 
     private func chooseProject() {
@@ -763,23 +704,5 @@ private struct RowsHeight: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
-    }
-}
-
-/// The chip's frame in the window, reported up so its menu can hang off it.
-private struct ChipFrame: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
-}
-
-/// Holds the destination menu's closures. `NSMenuItem` takes a target and a
-/// selector, so a closure needs an object to live on; the tag is the index.
-@MainActor private final class MenuActions: NSObject {
-    var handlers: [Int: () -> Void] = [:]
-
-    @objc func fire(_ sender: NSMenuItem) {
-        handlers[sender.tag]?()
     }
 }

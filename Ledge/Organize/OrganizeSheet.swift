@@ -56,13 +56,31 @@ struct OrganizeSheet: View {
     /// still moving through.
     private var isMoving: Bool { state.isOrganizing }
 
+    /// The folder chip's frame, so its menu hangs off the chip.
+    @State private var chipFrame: CGRect = .zero
+    @State private var menuActions = MenuActions()
+
+    /// The watched folders, as a menu under the chip.
+    @MainActor private func showFolderMenu(current: URL) {
+        let items = state.preferences.watchedFolders.map { url in
+            (title: url.lastPathComponent, checked: url == current, run: {
+                folder = url
+                // Exclusions name categories in *this* folder's plan. Carried
+                // across, one for a category the new folder has no row for
+                // would be an invisible rule with nothing on screen to
+                // explain it.
+                excluded = []
+                rescanToken += 1
+            })
+        }
+        menuActions.show(items, under: chipFrame, in: sheetWindow)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            Divider()
             errorBanner
             content
-            Divider()
             footer
         }
         .frame(width: 460)
@@ -109,27 +127,29 @@ struct OrganizeSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if let target = targetFolder {
-                Picker("Folder", selection: Binding(
-                    get: { target },
-                    set: { newFolder in
-                        folder = newFolder
-                        // Exclusions name categories in *this* folder's plan.
-                        // Carried across, one for a category the new folder has
-                        // no row for would be an invisible rule with nothing on
-                        // screen to explain it.
-                        excluded = []
-                        rescanToken += 1
+                HStack(spacing: 10) {
+                    // The design keeps this label visible; `.labelsHidden()`
+                    // left a bare popup with nothing saying what it chose.
+                    Text("Folder")
+                        .rowMeta()
+
+                    ChipButton(title: target.lastPathComponent) {
+                        showFolderMenu(current: target)
                     }
-                )) {
-                    ForEach(state.preferences.watchedFolders, id: \.self) { url in
-                        Text(url.lastPathComponent).tag(url)
-                    }
+                    .disabled(isMoving)
+                    .opacity(isMoving ? 0.5 : 1)
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(key: ChipFrame.self,
+                                                   value: proxy.frame(in: .global))
+                        }
+                    )
+                    .onPreferenceChange(ChipFrame.self) { chipFrame = $0 }
                 }
-                .labelsHidden()
-                .disabled(isMoving)
             }
         }
-        .padding(14)
+        .padding(.top, 16)
+        .padding(.horizontal, 18)
     }
 
     @ViewBuilder
@@ -160,6 +180,13 @@ struct OrganizeSheet: View {
                         // re-deriving it per section.
                         ForEach(preview.plan.filter { $0.destination.category == group.category }) { item in
                             HStack(spacing: 8) {
+                                // A folder is named as a whole, so it gets the
+                                // glyph that says so; everything else gets the
+                                // arrow the design puts before a destination.
+                                Image(systemName: item.isFolder
+                                      ? "folder" : "arrow.turn.down.right")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Theme.Colour.textTertiary)
                                 Text(item.source.lastPathComponent)
                                     .fieldText()
                                     .lineLimit(1)
@@ -184,7 +211,19 @@ struct OrganizeSheet: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
             .frame(height: 260)
+            // The design boxes this list. Without it the rows floated on the
+            // sheet and the 260pt had no edge to belong to.
+            .background {
+                RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
+                    .fill(Theme.Colour.fieldFill)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
+                    .stroke(Theme.Colour.chipBorder, lineWidth: 1)
+            }
+            .padding(.horizontal, 18)
         }
     }
 
@@ -229,13 +268,20 @@ struct OrganizeSheet: View {
             // hides the panel regardless. Nothing is lost by leaving: the batch
             // and its undo handle live on `AppState` now, and are still here
             // when the sheet is reopened.
+            // Both drawn to the design rather than left to the system's
+            // sheet-button chrome: 26pt tall, 6pt corners, 12pt type, the
+            // primary filled with the accent and the other with a field.
             Button(isMoving ? "Close" : "Cancel") { dismiss() }
+                .buttonStyle(SheetButtonStyle(isPrimary: false))
                 .keyboardShortcut(.cancelAction)
             Button(action: startMove) { Text(moveButtonTitle) }
+                .buttonStyle(SheetButtonStyle(isPrimary: true))
                 .keyboardShortcut(.defaultAction)
                 .disabled(movableCount == 0 || isMoving)
         }
-        .padding(12)
+        .padding(.top, 12)
+        .padding(.horizontal, 18)
+        .padding(.bottom, 14)
     }
 
     /// What the last batch actually did. The button promised a number before it

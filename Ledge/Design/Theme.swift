@@ -45,6 +45,31 @@ enum Theme {
         static let badge: CGFloat = 32
     }
 
+    /// The design's `box-shadow`s, converted once.
+    ///
+    /// CSS blur is roughly twice SwiftUI's radius, so `0 1px 2px` becomes
+    /// `radius: 1, y: 1`. Doing that arithmetic at each call site is how four
+    /// surfaces end up with four different ideas of the same shadow — which is
+    /// what happened here before this existed.
+    enum Shadow {
+        struct Spec {
+            let opacity: Double
+            let radius: CGFloat
+            let y: CGFloat
+        }
+
+        /// `.pop` — `0 .5px 1.5px rgba(0,0,0,.08)`
+        static let chip = Spec(opacity: 0.08, radius: 0.75, y: 0.5)
+        /// `.row` — `0 1px 2px rgba(0,0,0,.06)`
+        static let row = Spec(opacity: 0.06, radius: 1, y: 1)
+        /// `.field` — `0 .5px 1px rgba(0,0,0,.05)`
+        static let field = Spec(opacity: 0.05, radius: 0.5, y: 0.5)
+        /// `.seg .on` — `0 .5px 2px rgba(0,0,0,.18)`
+        static let segment = Spec(opacity: 0.18, radius: 1, y: 0.5)
+        /// The sheet's buttons.
+        static let button = Spec(opacity: 0.10, radius: 0.5, y: 0.5)
+    }
+
     enum Radius {
         static let field: CGFloat = 5
         /// Every filled or bordered pill in the design: the chip, the segment
@@ -122,6 +147,15 @@ enum Theme {
         static let badgeMovieBorder = dynamic(light: srgb(0xd0c2ee), dark: srgb(190, 150, 240, 0.45))
         static let badgeMovieLabel = dynamic(light: srgb(0x7a5bc0), dark: srgb(0xc3a3ef))
 
+        /// There is deliberately no token for the panel's own fill.
+        ///
+        /// The design gives `.panel` `rgba(246,245,243,.82)` with a 36px blur,
+        /// which is how the web imitates macOS vibrancy; the shelf takes a
+        /// system material instead, which is the real thing and behaves over
+        /// any wallpaper (spec §8.2). Its drop shadow and hairline come from
+        /// the panel window, not from us. An audit reading the stylesheet will
+        /// score all three as missing — they are answered here, not absent.
+        ///
         /// What Ledge paints over the panel's material.
         ///
         /// Nothing in light and nothing in Dark — there the material and the
@@ -276,6 +310,12 @@ extension View {
         font(.system(size: 13, weight: .semibold))
     }
 
+    /// One of the design's shadows. Named `themeShadow` rather than
+    /// overloading `shadow`, so a call site says which of the two it meant.
+    func themeShadow(_ spec: Theme.Shadow.Spec) -> some View {
+        shadow(color: .black.opacity(spec.opacity), radius: spec.radius, y: spec.y)
+    }
+
     /// The destination's name in the shelf's chip. The design gives it the
     /// panel's own 13pt — same as a row name — so this exists only to say that
     /// out loud after 15pt was tried and was not what the source says.
@@ -312,5 +352,143 @@ extension Theme {
         case .light: NSAppearance(named: .aqua)
         case .dark, .black: NSAppearance(named: .darkAqua)
         }
+    }
+}
+
+/// The design's `.pop` — a destination chip that opens something.
+///
+/// A `Button`, never a SwiftUI `Menu`. A macOS `Menu` owns how its label draws
+/// and how far it takes clicks, and it discards a background, border, shadow
+/// or trailing control given to it inside that label, sizes itself to its
+/// text, takes clicks only where the text is, and keeps the system control's
+/// height. Four separate defects, each fixable by moving one modifier in or
+/// out, and each fix breaking another. This exists so that is solved once
+/// rather than per surface.
+struct ChipButton: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Colour.accent)
+
+                // No breadcrumb parent: the design shows `Downloads ▸ Sorted`
+                // and this app has no `Sorted` — that half of the boards was
+                // dropped on purpose, so the leading segment would always be
+                // empty. Added back only if a second level ever exists.
+                Text(title)
+                    .destinationName()
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 16, height: 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(Theme.Colour.accent)
+                    )
+            }
+            .padding(.leading, 9)
+            .padding(.trailing, 7)
+            .frame(maxWidth: .infinity)
+            .frame(height: Theme.Size.popup)
+            .background {
+                RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
+                    .fill(Theme.Colour.chipFill)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
+                    .stroke(Theme.Colour.chipBorder, lineWidth: 1)
+            }
+            .themeShadow(Theme.Shadow.chip)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// A chip's frame in the window, reported up so a menu can hang off it.
+struct ChipFrame: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+/// Holds a menu's closures. `NSMenuItem` takes a target and a selector, so a
+/// closure needs an object to live on; the tag is the index.
+@MainActor final class MenuActions: NSObject {
+    var handlers: [Int: () -> Void] = [:]
+
+    @objc func fire(_ sender: NSMenuItem) {
+        handlers[sender.tag]?()
+    }
+
+    /// Builds a menu from titles and closures, and hangs it under `chipFrame`.
+    ///
+    /// The flip is not optional: SwiftUI's global space has its origin at the
+    /// top left and an AppKit content view has its own at the bottom left.
+    func show(_ items: [(title: String, checked: Bool, run: () -> Void)],
+              separatorBefore: Int? = nil,
+              under chipFrame: CGRect,
+              in window: NSWindow?) {
+        let menu = NSMenu()
+        handlers.removeAll()
+        for (offset, item) in items.enumerated() {
+            if offset == separatorBefore { menu.addItem(.separator()) }
+            let entry = NSMenuItem(title: item.title,
+                                   action: #selector(fire(_:)),
+                                   keyEquivalent: "")
+            entry.target = self
+            entry.tag = offset
+            entry.state = item.checked ? .on : .off
+            handlers[offset] = item.run
+            menu.addItem(entry)
+        }
+        guard let content = window?.contentView, chipFrame != .zero else {
+            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+            return
+        }
+        menu.popUp(positioning: nil,
+                   at: NSPoint(x: chipFrame.minX,
+                               y: content.bounds.height - chipFrame.maxY),
+                   in: content)
+    }
+}
+
+/// The Organize sheet's buttons, as the design draws them.
+///
+/// The system's own sheet-button chrome is close but not this: the design
+/// gives both a 26pt height, 6pt corners and 12pt type, fills the primary with
+/// the accent and the other with a field, and shadows both a half point.
+struct SheetButtonStyle: ButtonStyle {
+    let isPrimary: Bool
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12, weight: isPrimary ? .medium : .regular))
+            .foregroundStyle(isPrimary ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .padding(.horizontal, 12)
+            .frame(height: Theme.Size.button)
+            .background {
+                RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
+                    .fill(isPrimary ? Theme.Colour.accent : Theme.Colour.fieldFill)
+            }
+            .overlay {
+                if !isPrimary {
+                    RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous)
+                        .stroke(Theme.Colour.fieldBorder, lineWidth: 1)
+                }
+            }
+            .themeShadow(Theme.Shadow.button)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
     }
 }

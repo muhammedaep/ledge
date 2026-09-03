@@ -482,6 +482,7 @@ private struct CategoryRow: View {
                 RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
                     .stroke(Theme.Colour.fieldBorder, lineWidth: 1)
             }
+            .themeShadow(Theme.Shadow.field)
     }
 
     /// Patterns and diagnostics only.
@@ -572,7 +573,7 @@ private struct CategoryRow: View {
                     if isOn {
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
                             .fill(Theme.Colour.fieldFill)
-                            .shadow(color: .black.opacity(0.18), radius: 1, y: 0.5)
+                            .themeShadow(Theme.Shadow.segment)
                     }
                 }
                 .contentShape(Rectangle())
