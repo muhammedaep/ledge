@@ -116,6 +116,11 @@ struct RulesPane: View {
 
             fallbackRow(problems: problems[nil] ?? [])
         }
+        // The list would otherwise paint its own slab — the system's grey —
+        // over the window's ground, which is pure black in the Black
+        // appearance, and the pane would read as two surfaces stacked. The
+        // window paints the ground; the list lets it show.
+        .scrollContentBackground(.hidden)
     }
 
     /// The fallback is part of the rule set, not a category: it claims nothing,

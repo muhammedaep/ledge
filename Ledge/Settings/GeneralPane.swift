@@ -99,6 +99,9 @@ struct GeneralPane: View {
             }
         }
         .formStyle(.grouped)
+        // Same reason as the Rules list: the grouped form's own ground is the
+        // system's grey, and the window's is not.
+        .scrollContentBackground(.hidden)
     }
 
     /// Applies a finished rename. `Project.renamed` decides what a blank name
