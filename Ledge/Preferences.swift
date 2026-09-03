@@ -8,10 +8,6 @@ import ServiceManagement
 /// did before this setting existed — an upgrade changes nothing until asked.
 enum AppearanceSetting: String, CaseIterable {
     case system, light, dark, black
-
-    /// Both dark cases run on macOS's one dark appearance; `black` differs
-    /// only in what Ledge paints on top of it.
-    var isDarkAppearance: Bool { self == .dark || self == .black }
 }
 
 /// User settings, persisted to `UserDefaults` on every change.
@@ -85,7 +81,10 @@ final class Preferences {
         let defaults = UserDefaults.standard
         let saved = defaults.stringArray(forKey: Key.watchedFolders) ?? []
         watchedFolders = saved.isEmpty
-            ? [FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]]
+            // `.first` with a fallback rather than `[0]`: this runs before any
+            // window exists, so a trap here would be a silent launch failure.
+            ? [FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+               ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads")]
             : saved.map { URL(fileURLWithPath: $0) }
 
         let size = defaults.integer(forKey: Key.shelfSize)

@@ -1,24 +1,88 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {
-    "NSDownloadsFolderUsageDescription" : {
-      "comment" : "Shown by macOS in the consent dialog that grants Ledge access to Downloads. Set in English by INFOPLIST_KEY_NSDownloadsFolderUsageDescription; this catalog only translates it.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ledge files new downloads into folders for you."
+  "sourceLanguage": "en",
+  "strings": {
+    "NSDesktopFolderUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledge only touches the Desktop if you choose it as a watched folder or a project."
           }
         },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ledge, yeni indirilenleri sizin için klasörlere yerleştirir."
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledge, Masaüstü'ne yalnızca izlenen klasör ya da proje olarak seçerseniz dokunur."
+          }
+        }
+      }
+    },
+    "NSDocumentsFolderUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledge only touches Documents if you choose it as a watched folder or a project."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledge, Belgeler'e yalnızca izlenen klasör ya da proje olarak seçerseniz dokunur."
+          }
+        }
+      }
+    },
+    "NSDownloadsFolderUsageDescription": {
+      "comment": "Shown by macOS in the consent dialog that grants Ledge access to Downloads. Set in English by INFOPLIST_KEY_NSDownloadsFolderUsageDescription; this catalog only translates it.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledge files new downloads into folders for you."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledge, yeni indirilenleri sizin için klasörlere yerleştirir."
+          }
+        }
+      }
+    },
+    "NSNetworkVolumesUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledge reads a network drive only when you choose a folder on it."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledge, bir ağ sürücüsünü yalnızca üzerinde bir klasör seçerseniz okur."
+          }
+        }
+      }
+    },
+    "NSRemovableVolumesUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledge reads a removable drive only when you choose a folder on it."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledge, taşınabilir bir sürücüyü yalnızca üzerinde bir klasör seçerseniz okur."
           }
         }
       }
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

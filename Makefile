@@ -99,41 +99,78 @@ ifndef NOTARY_PROFILE
 	$(error NOTARY_PROFILE is not set. Create one with `xcrun notarytool store-credentials`, then pass it: make $(MAKECMDGOALS) NOTARY_PROFILE=ledge-notary)
 endif
 
+# `-allowProvisioningUpdates` on both signing steps: with automatic signing
+# and no certificate on the machine yet, the first run creates the Apple
+# Development and Developer ID Application certificates through the Apple ID
+# signed into Xcode (Xcode → Settings → Accounts). Without an account the
+# flag does nothing, so it costs a contributor nothing to leave it in.
 archive: require-team
 	xcodebuild archive -project $(PROJECT) -scheme $(SCHEME) \
 		-configuration Release -destination 'platform=macOS' \
 		-archivePath $(ARCHIVE) \
+		-allowProvisioningUpdates \
 		DEVELOPMENT_TEAM=$(TEAM_ID)
 
 export-app: archive
 	rm -rf $(EXPORT)
 	xcodebuild -exportArchive -archivePath $(ARCHIVE) \
-		-exportPath $(EXPORT) -exportOptionsPlist ExportOptions.plist
+		-exportPath $(EXPORT) -exportOptionsPlist ExportOptions.plist \
+		-allowProvisioningUpdates
 
 # A staging folder with an /Applications symlink beside the app, so the
 # mounted volume is the drag-to-install window people expect rather than a
-# lone binary they have to know what to do with.
-dmg: export-app
+# lone binary they have to know what to do with. A macro, because `notarize`
+# packages the DMG again after stapling the app, and a `dmg` prerequisite
+# would re-export first and throw that staple away.
+define PACKAGE_DMG
 	rm -rf $(STAGE) $(DMG)
 	mkdir -p $(STAGE)
 	cp -R $(EXPORT)/$(APP).app $(STAGE)/
 	ln -s /Applications $(STAGE)/Applications
 	hdiutil create -volname $(APP) -srcfolder $(STAGE) \
 		-ov -format UDZO $(DMG)
+endef
 
-notarize: require-notary dmg
-	xcrun notarytool submit $(DMG) --keychain-profile $(NOTARY_PROFILE) --wait
+dmg: export-app
+	$(PACKAGE_DMG)
+
+# `submit --wait` on a refusal prints an id and nothing a person can act on;
+# the log is where Apple says what it objected to, so fetch it.
+define NOTARIZE
+	xcrun notarytool submit $(1) --keychain-profile $(NOTARY_PROFILE) --wait \
+	|| { echo "Apple refused $(1). Its log:"; \
+	     xcrun notarytool log "$$$$(xcrun notarytool history --keychain-profile $(NOTARY_PROFILE) --output-format json \
+	         | python3 -c 'import json,sys; print(json.load(sys.stdin)["history"][0]["id"])')" \
+	         --keychain-profile $(NOTARY_PROFILE); exit 1; }
+endef
+
+# Twice, on purpose. The app first, so the copy a user drags into
+# /Applications carries its own ticket and opens on a Mac that is offline;
+# then the DMG built from that stapled app, so the disk image opens cleanly
+# too. Stapling only the DMG leaves the installed app dependent on an online
+# lookup at first launch.
+notarize: require-notary export-app
+	rm -f $(BUILD)/$(APP).zip
+	ditto -c -k --keepParent $(EXPORT)/$(APP).app $(BUILD)/$(APP).zip
+	$(call NOTARIZE,$(BUILD)/$(APP).zip)
+	xcrun stapler staple $(EXPORT)/$(APP).app
+	$(PACKAGE_DMG)
+	$(call NOTARIZE,$(DMG))
 	xcrun stapler staple $(DMG)
 
-# Worth running before publishing: `spctl` is the check that answers the
-# question users actually care about — whether Gatekeeper opens it without a
-# right-click.
-#
-# Depends on export-app so it can never be pointed at an absent
-# $(EXPORT)/$(APP).app and report success on a path that isn't there.
-verify: export-app
+# The check that answers the question users care about: does Gatekeeper open
+# it without a right-click. It runs on what will ship — the stapled app and
+# the stapled DMG — and deliberately does not depend on `export-app`, which
+# would replace the stapled app with a fresh, ticketless one and report
+# "Unnotarized Developer ID" after a perfectly good notarization.
+verify:
+	@test -d $(EXPORT)/$(APP).app || { echo "No app at $(EXPORT)/$(APP).app — run make notarize first."; exit 1; }
+	@test -f $(DMG) || { echo "No DMG at $(DMG) — run make notarize first."; exit 1; }
 	codesign --verify --deep --strict --verbose=2 $(EXPORT)/$(APP).app
+	xcrun stapler validate $(EXPORT)/$(APP).app
 	spctl --assess --type exec --verbose=2 $(EXPORT)/$(APP).app
+	xcrun stapler validate $(DMG)
+	spctl --assess --type open --context context:primary-signature --verbose=2 $(DMG)
 
-release: test notarize
+release: test notarize verify
 	@echo "Ready: $(DMG)"

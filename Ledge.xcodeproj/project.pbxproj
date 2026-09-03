@@ -20,6 +20,7 @@
 		A1B2C3D400114455AA660016 /* RulesPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660015 /* RulesPane.swift */; };
 		A1B2C3D400114455AA660018 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660017 /* Localizable.xcstrings */; };
 		A1B2C3D400114455AA66001B /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66001A /* InfoPlist.xcstrings */; };
+		A1B2C3D400114455AA6600E2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA6600E1 /* Assets.xcassets */; };
 		A1B2C3D400114455AA66001D /* ErrorBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66001C /* ErrorBanner.swift */; };
 		A1B2C3D400114455AA66001F /* WindowReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66001E /* WindowReader.swift */; };
 		906E66B5C4674E7B3F07D17C /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49DA3A7BF2DC04291BDF8698 /* Theme.swift */; };
@@ -42,6 +43,7 @@
 		A1B2C3D400114455AA660015 /* RulesPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesPane.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA660017 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		A1B2C3D400114455AA66001A /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
+		A1B2C3D400114455AA6600E1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		49DA3A7BF2DC04291BDF8698 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		6D1051BDFDC83E7FE504853B /* TypeBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypeBadge.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -89,6 +91,7 @@
 			children = (
 				A1B2C3D400114455AA660017 /* Localizable.xcstrings */,
 				A1B2C3D400114455AA66001A /* InfoPlist.xcstrings */,
+				A1B2C3D400114455AA6600E1 /* Assets.xcassets */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -212,6 +215,7 @@
 			files = (
 				A1B2C3D400114455AA660018 /* Localizable.xcstrings in Resources */,
 				A1B2C3D400114455AA66001B /* InfoPlist.xcstrings in Resources */,
+				A1B2C3D400114455AA6600E2 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -372,8 +376,12 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Ledge only touches the Desktop if you choose it as a watched folder or a project.";
+				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Ledge only touches Documents if you choose it as a watched folder or a project.";
 				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "Ledge files new downloads into folders for you.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Muhammed Celebi. MIT licensed.";
+				INFOPLIST_KEY_NSNetworkVolumesUsageDescription = "Ledge reads a network drive only when you choose a folder on it.";
+				INFOPLIST_KEY_NSRemovableVolumesUsageDescription = "Ledge reads a removable drive only when you choose a folder on it.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -398,8 +406,12 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Ledge only touches the Desktop if you choose it as a watched folder or a project.";
+				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Ledge only touches Documents if you choose it as a watched folder or a project.";
 				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "Ledge files new downloads into folders for you.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Muhammed Celebi. MIT licensed.";
+				INFOPLIST_KEY_NSNetworkVolumesUsageDescription = "Ledge reads a network drive only when you choose a folder on it.";
+				INFOPLIST_KEY_NSRemovableVolumesUsageDescription = "Ledge reads a removable drive only when you choose a folder on it.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
