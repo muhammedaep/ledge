@@ -112,7 +112,7 @@ archive: require-team
 		DEVELOPMENT_TEAM=$(TEAM_ID)
 
 export-app: archive
-	rm -rf $(EXPORT)
+	rm -rf $(EXPORT) $(BUILD)/notary-*.id
 	xcodebuild -exportArchive -archivePath $(ARCHIVE) \
 		-exportPath $(EXPORT) -exportOptionsPlist ExportOptions.plist \
 		-allowProvisioningUpdates
@@ -134,14 +134,27 @@ endef
 dmg: export-app
 	$(PACKAGE_DMG)
 
-# `submit --wait` on a refusal prints an id and nothing a person can act on;
-# the log is where Apple says what it objected to, so fetch it.
+# Submit, then wait, then ask — three calls rather than one `submit --wait`,
+# because the single call conflates three different outcomes into one exit
+# code: Apple refusing the build, Apple still thinking, and the connection to
+# Apple dropping. Only the first is a reason to stop. The submission id is
+# written beside the build, so a run cut off by a dropped connection resumes
+# with `make notarize` instead of uploading the same bytes again; `export-app`
+# clears the ids because a fresh export is fresh bytes.
+#   $(1) the file to notarize   $(2) a short name for the id file
 define NOTARIZE
-	xcrun notarytool submit $(1) --keychain-profile $(NOTARY_PROFILE) --wait \
-	|| { echo "Apple refused $(1). Its log:"; \
-	     xcrun notarytool log "$$(xcrun notarytool history --keychain-profile $(NOTARY_PROFILE) --output-format json \
-	         | python3 -c 'import json,sys; print(json.load(sys.stdin)["history"][0]["id"])')" \
-	         --keychain-profile $(NOTARY_PROFILE); exit 1; }
+	@idfile=$(BUILD)/notary-$(2).id; \
+	if [ -s "$$idfile" ]; then id=$$(cat "$$idfile"); echo "Resuming $(1): submission $$id"; \
+	else id=$$(xcrun notarytool submit $(1) --keychain-profile $(NOTARY_PROFILE) --output-format json \
+	        | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])') || exit 1; \
+	     echo "$$id" > "$$idfile"; echo "Submitted $(1): $$id"; fi; \
+	until xcrun notarytool wait "$$id" --keychain-profile $(NOTARY_PROFILE) --timeout 2h; do \
+	  echo "Lost the connection to Apple while waiting; asking again in 30s."; sleep 30; done; \
+	status=$$(xcrun notarytool info "$$id" --keychain-profile $(NOTARY_PROFILE) --output-format json \
+	        | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])'); \
+	echo "Apple says: $$status"; \
+	if [ "$$status" != "Accepted" ]; then echo "Apple did not accept $(1). Its log:"; \
+	  xcrun notarytool log "$$id" --keychain-profile $(NOTARY_PROFILE); exit 1; fi
 endef
 
 # Twice, on purpose. The app first, so the copy a user drags into
@@ -150,12 +163,11 @@ endef
 # too. Stapling only the DMG leaves the installed app dependent on an online
 # lookup at first launch.
 notarize: require-notary export-app
-	rm -f $(BUILD)/$(APP).zip
-	ditto -c -k --keepParent $(EXPORT)/$(APP).app $(BUILD)/$(APP).zip
-	$(call NOTARIZE,$(BUILD)/$(APP).zip)
+	@[ -s $(BUILD)/notary-app.id ] || { rm -f $(BUILD)/$(APP).zip; ditto -c -k --keepParent $(EXPORT)/$(APP).app $(BUILD)/$(APP).zip; }
+	$(call NOTARIZE,$(BUILD)/$(APP).zip,app)
 	xcrun stapler staple $(EXPORT)/$(APP).app
 	$(PACKAGE_DMG)
-	$(call NOTARIZE,$(DMG))
+	$(call NOTARIZE,$(DMG),dmg)
 	xcrun stapler staple $(DMG)
 
 # The check that answers the question users care about: does Gatekeeper open
