@@ -165,15 +165,25 @@ undo for every file filed from a folder the user has since stopped watching.
 That trade was not taken on the day of the first release; it is recorded here
 so it is taken deliberately.
 
-## There is no update mechanism
+## Updates depend on one Mac's keychain
 
-The first release went out on 2026-09-03 as a Developer ID–signed, notarized
-DMG, universal (`lipo` reports `x86_64 arm64`). Nothing in the app checks for
-a newer version, downloads one, or tells the user one exists. A new version is
-a new DMG the user has to find and install by hand, and until that changes
-every release note has to say so. There is no Homebrew cask and no App Store
-presence either; `make build` and CI still produce a binary for the machine
-that built them, and only `make release` produces the universal one.
+Updates arrive through Sparkle: the app checks `muhammed.studio/ledge/appcast.xml`
+once a day and installs what it finds there, provided the download's EdDSA
+signature verifies against the public key baked into `Info.plist`. The private
+half of that key was made once, on the Mac that cut the first release, and
+lives in its keychain; `~/Documents/ledge-signing/` on that Mac holds its
+export. Lose both and no installed copy will ever accept another update — the
+only way forward would be a new key and a fresh download for everyone. The
+export is the one file in this project that has to be kept somewhere safe.
+
+Two rules follow from how Sparkle compares versions: `CURRENT_PROJECT_VERSION`
+goes up by one on every release, and the tag, the disk image's name on the
+GitHub release and `CFBundleShortVersionString` have to agree (`v1.0.0`,
+`Ledge.dmg`, `1.0.0`), because the appcast entry is built from them.
+
+There is still no Homebrew cask and no App Store presence; `make build` and
+CI produce a binary for the machine that built them, and only `make release`
+produces the universal one.
 
 ## The Rules tab has no drag-to-reorder
 

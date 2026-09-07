@@ -15,8 +15,8 @@ directory.
 
 > **Status: first release.** Ledge ships as a Developer ID–signed, notarized
 > `Ledge.dmg` that opens on a double-click. There is no Homebrew cask, nothing
-> on the App Store, and no in-app updater yet — a new version is a new DMG.
-> See [Installing](#installing).
+> on the App Store. Updates arrive in the app: it checks once a day and
+> offers the new version in place (Sparkle). See [Installing](#installing).
 
 ## What it does
 
@@ -197,6 +197,25 @@ the same list lives in `docs/manual-checks.tr.md`.
 
 `docs/known-limitations.md` records what was deliberately left, and why, while the
 reasons were still legible.
+
+### Cutting a release
+
+1. Raise `MARKETING_VERSION` (the version people see, `1.0.1`) and
+   `CURRENT_PROJECT_VERSION` (the build number, one higher than last time —
+   Sparkle orders releases by it) in the project. Write the notes in
+   `docs/releases/<version>.md`.
+2. `make release TEAM_ID=… NOTARY_PROFILE=… SITE_DIR=../muhammed-studio`. That
+   runs the tests, archives a universal build, signs and notarizes the app and
+   then the disk image, staples both, verifies what will ship, and writes the
+   appcast entry — signed with the update key in this Mac's keychain — into the
+   site checkout.
+3. Tag `v<version>`, create the GitHub release with `build/Ledge.dmg` attached
+   under that exact name, then commit and deploy the site so the appcast goes
+   live. Installed copies pick the update up on their next daily check.
+
+The update key was made once with Sparkle's `generate_keys`; its export is the
+one file to keep safe, because an app in the wild trusts only updates signed
+with it.
 
 ## Contributing
 

@@ -266,7 +266,15 @@ Bu kontrol ekran dışında yapılamaz. Projenin her zamanki renk kanıtı olan
 `ImageRenderer` penceresiz çizdiği için uygulama görünümünü hiç görmez —
 `known-limitations.md`'ye bak.
 
-## 15. Burada hiç doğrulanamayanlar
+## 15. Güncelleyici cevap veriyor
+
+Settings → General → Updates. **Check for Updates…** (Güncellemeleri Denetle…)
+düğmesine bas. Yayında daha yeni bir sürüm yoksa Sparkle'ın kendi penceresi
+bunu söylemeli; yeni bir appcast kaydı canlıysa sürümü önermeli, indirmeli ve
+ona yeniden başlamalı. Kontrol sürerken düğme gri olur, üstündeki anahtar
+günlük kontrolü kapatır. Bir güncellemenin kurulmasını henüz kimse izlemedi.
+
+## 16. Burada hiç doğrulanamayanlar
 
 Renk, aşağıdaki listede bilerek yok. Bu arayüzü kuran görevlerden üçü rengi
 ekran dışı `ImageRenderer` ile ölçtü — gerçek görünümü render edip pikselleri

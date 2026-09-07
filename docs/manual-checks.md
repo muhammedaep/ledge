@@ -252,7 +252,15 @@ This one cannot be checked off-screen. The project's usual colour evidence,
 `ImageRenderer`, renders without a window and never sees the app appearance at
 all — see `known-limitations.md`.
 
-## 15. What could not be established here at all
+## 15. The updater answers
+
+Settings → General → Updates. Click **Check for Updates…**. With nothing newer
+published it should say so in Sparkle's own window; with a newer appcast entry
+live it should offer the version, download it, and relaunch into it. The
+button greys out while a check runs, and the switch above it turns the daily
+check off. Nobody has watched an update install yet.
+
+## 16. What could not be established here at all
 
 Colour is deliberately missing from the list below. Three of the tasks that
 built this interface measured it off-screen with `ImageRenderer` — rendering
