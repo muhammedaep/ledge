@@ -143,12 +143,37 @@ light branch and dark to the dark one, which is how the setting was verified.
 colour" inside one appearance. It is the wrong tool for anything that depends
 on which appearance is current.
 
-## The build is native-arch only
+## The journal and the folder lists are trusted
 
-`make build` and CI produce a binary for the machine that built them. `make
-archive` is intended to produce a universal build and has never been run. There is
-no notarised release, no Homebrew cask, and no App Store presence — the README says
-so, and it should keep saying so until one of those is actually true.
+`journal.json`, `projects.json` and the watched-folder list live in
+`~/Library/Application Support/Ledge`, and the paths in them are acted on as
+written: undo moves `to` back into `from`, the shelf row drags `to` out and
+reveals it in Finder, the watcher opens whatever folder the list names. On
+load the journal now drops any record whose paths are not file URLs — `URL`
+decodes `https://…` without complaint and its `.path` is a filesystem path —
+but a record that names two real folders is believed.
+
+The boundary this draws: anything that can write to the user's Application
+Support folder can make Ledge move a file between two paths of its choosing,
+under Ledge's own Files and Folders grants, behind a row whose name is
+whatever the record says. That is the user's own account writing to the
+user's own files, which is where every unsandboxed app's trust ends — but
+Ledge holds folder grants a lesser process may not, and the confused-deputy
+shape is real. The stricter fix, refusing any record whose `to` is not inside
+a folder Ledge currently watches or a project it knows, would also silence
+undo for every file filed from a folder the user has since stopped watching.
+That trade was not taken on the day of the first release; it is recorded here
+so it is taken deliberately.
+
+## There is no update mechanism
+
+The first release went out on 2026-09-03 as a Developer ID–signed, notarized
+DMG, universal (`lipo` reports `x86_64 arm64`). Nothing in the app checks for
+a newer version, downloads one, or tells the user one exists. A new version is
+a new DMG the user has to find and install by hand, and until that changes
+every release note has to say so. There is no Homebrew cask and no App Store
+presence either; `make build` and CI still produce a binary for the machine
+that built them, and only `make release` produces the universal one.
 
 ## The Rules tab has no drag-to-reorder
 
@@ -164,3 +189,19 @@ is a second route that does not exist yet.
 has set a pink system accent sees the design's blue. That followed from the
 instruction that it look exactly like the design, and it is recorded here so
 the next person reads it as a decision rather than an oversight.
+
+## A dragged row hands over a copy
+
+The drag out of the shelf puts one thing on the pasteboard, `public.file-url`,
+the way Finder's own drags do. SwiftUI's `onDrag` on macOS does not pass that
+URL through, though: it copies the file into
+`~/Library/Caches/com.apple.SwiftUI.Drag-<UUID>/` and the drop target is
+given *that* path — read off the drag pasteboard after a real drop on
+2026-09-03. So a row dropped on the Desktop puts a copy there, the filed file
+stays where it was, and undo keeps working.
+
+Until that day the row used `NSItemProvider(contentsOf:)`, which also
+registers the file's content type as a *file representation*, and the copy
+then arrived named `.com.apple.Foundation.NSItemProvider.XXXXXX.pdf` — an
+invoice nobody could recognise. The name is right now; the copy is SwiftUI's
+and stays.

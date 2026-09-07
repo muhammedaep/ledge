@@ -1,5 +1,7 @@
 # Ledge
 
+> Türkçe: [`README.tr.md`](README.tr.md)
+
 **Ledge files your downloads into typed folders the moment they land — and
 keeps the recent ones one click away in the menu bar, still draggable into
 whatever you're working in.**
@@ -11,10 +13,10 @@ a mess. Ledge does both.
 It was written against a real `~/Downloads`: 1,504 items and 37 GB in one flat
 directory.
 
-> **Status: not released yet.** There is no signed build, no notarized DMG, no
-> Homebrew cask, and nothing on the App Store. Today the way to run Ledge is to
-> [build it from source](#building). See [Installing](#installing) for what that
-> means on first launch.
+> **Status: first release.** Ledge ships as a Developer ID–signed, notarized
+> `Ledge.dmg` that opens on a double-click. There is no Homebrew cask, nothing
+> on the App Store, and no in-app updater yet — a new version is a new DMG.
+> See [Installing](#installing).
 
 ## What it does
 
@@ -39,8 +41,9 @@ This is the feature that came from an actual chore: collecting twenty-five files
 into a project folder by hand, one download at a time. With a project active you
 just download them.
 
-The active project is chosen from the shelf's *Filing into:* menu, or from
-Settings. Switching back is the same menu. If the project folder goes away —
+The active project is chosen from the destination list at the top of the
+shelf, or from Settings. Switching back is the same list, and the minus at the
+end of a project's row forgets it. If the project folder goes away —
 deleted, or on a volume that got unmounted — Ledge files into the watched folder
 instead and says so. It never recreates a folder you removed.
 
@@ -85,9 +88,8 @@ the Trash, or resynced by iCloud or Dropbox) it is still individually undoable.
 macOS 14.0 (Sonoma) or later.
 
 `make build` and CI produce a binary for the architecture of the machine that
-built it. `make archive` is intended to produce a universal build — Apple
-Silicon and Intel — but it has not been run yet, so treat that as unverified
-until someone cuts the first release and checks it.
+built it. `make release` produces a universal build — Apple Silicon and Intel
+in one binary, checked with `lipo` on the first release.
 
 Ledge lives only in the menu bar; there is no Dock icon and no main window.
 
@@ -101,20 +103,24 @@ Files and Folders.
 
 ## Installing
 
-There is no release build yet. Until there is, [build from source](#building) —
-an app you built yourself opens normally, with no Gatekeeper prompt and nothing
-to click past. Gatekeeper gates on the quarantine flag that a *browser* attaches
-to a download, and a local build never has one.
+1. Open `Ledge.dmg` and drag **Ledge** onto the **Applications** folder beside
+   it.
+2. Eject the disk image and launch Ledge from `/Applications`. Launch it from
+   there, not from the mounted image: macOS runs an app straight off a DMG
+   from a temporary, read-only location, and a login item registered from
+   there does not survive.
+3. Look for a tray icon in the menu bar — there is no Dock icon and no window.
+4. The first time it looks at `~/Downloads`, macOS asks. Allow it; see
+   [Permissions](#permissions) for what happens if you don't.
 
-That changes the day there is something to download. An unsigned or
-ad-hoc-signed release, fetched from a browser, will be refused on a normal
-double-click: **right-click the app → Open**, then confirm, once — after that it
-opens normally. A notarized release needs none of that, which is the point of
-notarizing it.
+The DMG is signed with a Developer ID and notarized by Apple, and both the
+disk image and the app inside it carry their notarization tickets, so it opens
+on a normal double-click — no right-click, no warning to click past, online or
+offline.
 
-The release path is written and checked in (`make dmg`, `make notarize`); it
-just hasn't been run, because the Apple Developer Program enrolment behind it is
-still activating.
+An app you [build from source](#building) opens normally too: Gatekeeper gates
+on the quarantine flag a *browser* attaches to a download, and a local build
+never has one.
 
 ## Configuration
 
