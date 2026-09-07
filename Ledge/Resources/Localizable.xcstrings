@@ -263,6 +263,38 @@
         }
       }
     },
+    "Check for Updates…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check for Updates…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Güncellemeleri Denetle…"
+          }
+        }
+      }
+    },
+    "Check for updates automatically": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check for updates automatically"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Güncellemeleri otomatik denetle"
+          }
+        }
+      }
+    },
     "Choose Folder Again…": {
       "localizations": {
         "tr": {
@@ -1537,6 +1569,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaydedilmemiş değişiklikler"
+          }
+        }
+      }
+    },
+    "Updates": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updates"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Güncellemeler"
           }
         }
       }

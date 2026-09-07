@@ -12,6 +12,8 @@
 		A1B2C3D400114455AA660002 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660001 /* Preferences.swift */; };
 		A1B2C3D400114455AA660004 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660003 /* AppState.swift */; };
 		A1B2C3D400114455AA660005 /* LedgeCore in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D400114455AA660007 /* LedgeCore */; };
+		A1B2C3D400114455AA6600F1 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D400114455AA6600F2 /* Sparkle */; };
+		A1B2C3D400114455AA6600F4 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA6600F3 /* Updater.swift */; };
 		A1B2C3D400114455AA660009 /* ShelfRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA660008 /* ShelfRow.swift */; };
 		A1B2C3D400114455AA66000B /* OrganizeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66000A /* OrganizeSheet.swift */; };
 		A1B2C3D400114455AA66000D /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400114455AA66000C /* SettingsView.swift */; };
@@ -32,6 +34,7 @@
 		F194968E22304171A2B77924 /* LedgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgeApp.swift; sourceTree = "<group>"; };
 		79F2B1F6E27F4C7DAA626279 /* ShelfView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfView.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA660001 /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
+		A1B2C3D400114455AA6600F3 /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA66001C /* ErrorBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorBanner.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA66001E /* WindowReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowReader.swift; sourceTree = "<group>"; };
 		A1B2C3D400114455AA660003 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -54,6 +57,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D400114455AA660005 /* LedgeCore in Frameworks */,
+				A1B2C3D400114455AA6600F1 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -74,6 +78,7 @@
 				F194968E22304171A2B77924 /* LedgeApp.swift */,
 				A1B2C3D400114455AA660003 /* AppState.swift */,
 				A1B2C3D400114455AA660001 /* Preferences.swift */,
+				A1B2C3D400114455AA6600F3 /* Updater.swift */,
 				A1B2C3D400114455AA66001C /* ErrorBanner.swift */,
 				A1B2C3D400114455AA66001E /* WindowReader.swift */,
 				19C7F09942DB4C26BB9C6052 /* Shelf */,
@@ -166,6 +171,7 @@
 			name = Ledge;
 			packageProductDependencies = (
 				A1B2C3D400114455AA660007 /* LedgeCore */,
+				A1B2C3D400114455AA6600F2 /* Sparkle */,
 			);
 			productName = Ledge;
 			productReference = 8D2901CE4CED4DEAB33BB283 /* Ledge.app */;
@@ -198,6 +204,7 @@
 			mainGroup = 7A6E829AE29041289A771044;
 			packageReferences = (
 				A1B2C3D400114455AA660006 /* XCLocalSwiftPackageReference "LedgeCore" */,
+				A1B2C3D400114455AA6600F5 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			productRefGroup = DF2E10727A7D47598DD16158 /* Products */;
 			projectDirPath = "";
@@ -229,6 +236,7 @@
 				015B5D0888AC4145BDFCD24A /* LedgeApp.swift in Sources */,
 				A1B2C3D400114455AA660004 /* AppState.swift in Sources */,
 				A1B2C3D400114455AA660002 /* Preferences.swift in Sources */,
+				A1B2C3D400114455AA6600F4 /* Updater.swift in Sources */,
 				A1B2C3D400114455AA66001D /* ErrorBanner.swift in Sources */,
 				A1B2C3D400114455AA66001F /* WindowReader.swift in Sources */,
 				23262EB335314923875619E8 /* ShelfView.swift in Sources */,
@@ -375,6 +383,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Ledge/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Ledge only touches the Desktop if you choose it as a watched folder or a project.";
 				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Ledge only touches Documents if you choose it as a watched folder or a project.";
@@ -386,7 +395,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = studio.muhammed.Ledge;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -405,6 +414,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Ledge/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Ledge only touches the Desktop if you choose it as a watched folder or a project.";
 				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Ledge only touches Documents if you choose it as a watched folder or a project.";
@@ -416,7 +426,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = studio.muhammed.Ledge;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -454,7 +464,23 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		A1B2C3D400114455AA6600F5 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		A1B2C3D400114455AA6600F2 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1B2C3D400114455AA6600F5 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		A1B2C3D400114455AA660007 /* LedgeCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = LedgeCore;

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Merged into the generated Info.plist. Only what Xcode's
+	     INFOPLIST_KEY_* settings cannot express lives here: Sparkle's keys. -->
+	<key>SUFeedURL</key>
+	<string>https://muhammed.studio/ledge/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>P4fH8Vp6A9+u4lJjhF6IXiuMs/1SGf3+ngg3X/bDIoI=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+</dict>
+</plist>

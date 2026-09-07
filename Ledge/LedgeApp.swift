@@ -14,6 +14,8 @@ struct LedgeApp: App {
         // rather than flashing the system appearance and then correcting.
         Theme.apply(state.preferences.appearance)
         state.startWatching()
+        // Starts Sparkle's scheduled check whether or not Settings is ever opened.
+        _ = Updater.shared
     }
 
     var body: some Scene {

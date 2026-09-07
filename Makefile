@@ -29,7 +29,7 @@ LANGUAGE := tr
 .DEFAULT_GOAL := help
 # `export-app`, not `export`: `export` is a GNU Make directive, and a target
 # sharing that name is asking a future make version to reinterpret the line.
-.PHONY: help test build strings clean archive export-app dmg notarize notarize-resume verify \
+.PHONY: help test build strings clean archive export-app dmg notarize notarize-resume verify appcast \
         release require-team require-notary
 
 help:
@@ -214,5 +214,30 @@ verify:
 	 spctl --assess --type exec --verbose=2 "$$mnt/$(APP).app"; rc=$$?; \
 	 hdiutil detach "$$mnt" -quiet; exit $$rc
 
-release: test notarize verify
-	@echo "Ready: $(DMG)"
+# The appcast Sparkle reads: one entry per release, each carrying the DMG's
+# EdDSA signature. generate_appcast signs with the private key in this Mac's
+# keychain (made once with generate_keys; its export is the thing to back up)
+# and points the enclosure at the GitHub release for this version, so the
+# tag, the asset name and CFBundleShortVersionString have to agree:
+# v1.0.0 ⇄ 1.0.0 ⇄ Ledge.dmg. Sparkle orders releases by CFBundleVersion, so
+# CURRENT_PROJECT_VERSION goes up by one every release, without exception.
+# The file is served from the site; SITE_DIR names that checkout.
+SPARKLE_BIN = $(DERIVED)/SourcePackages/artifacts/sparkle/Sparkle/bin
+VERSION = $(shell plutil -extract CFBundleShortVersionString raw $(EXPORT)/$(APP).app/Contents/Info.plist 2>/dev/null)
+APPCAST_SRC = $(BUILD)/appcast-src
+APPCAST = $(BUILD)/appcast.xml
+SITE_DIR ?=
+
+appcast:
+	@test -f $(DMG) || { echo "No DMG at $(DMG) — run make notarize first."; exit 1; }
+	@test -n "$(VERSION)" || { echo "No exported app to read the version from."; exit 1; }
+	rm -rf $(APPCAST_SRC) && mkdir -p $(APPCAST_SRC) && cp $(DMG) $(APPCAST_SRC)/
+	$(SPARKLE_BIN)/generate_appcast \
+		--download-url-prefix "https://github.com/muhammedaep/ledge/releases/download/v$(VERSION)/" \
+		--link "https://muhammed.studio/ledge" \
+		-o $(APPCAST) $(APPCAST_SRC)
+	@echo "Appcast for $(VERSION): $(APPCAST)"
+	@if [ -n "$(SITE_DIR)" ]; then cp $(APPCAST) "$(SITE_DIR)/public/ledge/appcast.xml" && echo "Copied to $(SITE_DIR)/public/ledge/appcast.xml — commit and deploy the site."; fi
+
+release: test notarize verify appcast
+	@echo "Ready: $(DMG) and $(APPCAST)"

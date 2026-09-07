@@ -4,8 +4,10 @@ import SwiftUI
 
 /// Settings › General: whether Ledge files at all, where it watches, where it
 /// can file to, and how much of the journal the shelf shows.
+@MainActor
 struct GeneralPane: View {
     @Environment(AppState.self) private var state
+    @ObservedObject private var updater = Updater.shared
 
     var body: some View {
         @Bindable var preferences = state.preferences
@@ -96,6 +98,17 @@ struct GeneralPane: View {
                         // count until the next file is filed.
                         Task { await state.reloadShelf() }
                     }
+            }
+
+            // Sparkle does the rest in its own windows; this is only the
+            // switch and the button. The button greys out while a check or an
+            // install is already running.
+            Section("Updates") {
+                Toggle("Check for updates automatically",
+                       isOn: Binding(get: { updater.checksAutomatically },
+                                     set: { updater.checksAutomatically = $0 }))
+                Button("Check for Updates…") { updater.checkForUpdates() }
+                    .disabled(!updater.canCheck)
             }
         }
         .formStyle(.grouped)
